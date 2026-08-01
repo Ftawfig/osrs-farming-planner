@@ -98,10 +98,14 @@ export interface LineItem {
   qty: number;
   unit: number;
   total: number;
+  /** What is being bought or sold. Absent for pure gp fees, like clearing. */
+  item?: ItemKey;
 }
 
 export interface CropResult {
   kind: PatchKind;
+  /** Which crop of that kind — `magic`, `torstol`, and so on. */
+  cropKey: string;
   label: string;
   patches: number;
   survival: number;
@@ -184,6 +188,7 @@ function compostCost(prices: PriceMap, tier: CompostTier): number {
 /** Everything one patch type contributes, before protection payments are settled. */
 interface CropDraft {
   kind: PatchKind;
+  cropKey: string;
   label: string;
   patches: number;
   runsPerDay: number;
@@ -207,9 +212,15 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
   const demanded = new Map<ItemKey, number>();
   const add = (m: Map<ItemKey, number>, k: ItemKey, n: number) => m.set(k, (m.get(k) ?? 0) + n);
 
-  const pushDaily = (arr: LineItem[], label: string, qtyPerDay: number, unit: number) => {
+  const pushDaily = (
+    arr: LineItem[],
+    label: string,
+    qtyPerDay: number,
+    unit: number,
+    item?: ItemKey,
+  ) => {
     if (qtyPerDay <= 0 || unit <= 0) return;
-    arr.push({ label, qty: qtyPerDay, unit, total: qtyPerDay * unit });
+    arr.push({ label, qty: qtyPerDay, unit, total: qtyPerDay * unit, item });
   };
 
   const farmingLevel = levelForXp(cfg.currentXp);
@@ -233,7 +244,7 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     const runs = cfg.treeRunsPerDay;
 
     let cost = patches * price(prices, tree.seedItem);
-    pushDaily(costItems, `${tree.name} seeds`, patches * runs, price(prices, tree.seedItem));
+    pushDaily(costItems, `${tree.name} seeds`, patches * runs, price(prices, tree.seedItem), tree.seedItem);
 
     let demandValue = 0;
     if (cfg.treeStrategy === 'pay') {
@@ -243,7 +254,13 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     } else if (tier !== 'none') {
       const unit = compostCost(prices, tier);
       cost += patches * unit;
-      pushDaily(costItems, `${COMPOST[tier].label} (${tree.name.toLowerCase()})`, patches * runs, unit);
+      pushDaily(
+        costItems,
+        `${COMPOST[tier].label} (${tree.name.toLowerCase()})`,
+        patches * runs,
+        unit,
+        COMPOST[tier].item ?? undefined,
+      );
     }
 
     const clear = clearing(patches);
@@ -259,11 +276,24 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     // forfeits both.
     const rootsQty = chopping && cfg.sellRoots ? survived * rootsPerTree(tree, farmingLevel) : 0;
     const logsQty = chopping && cfg.sellLogs ? survived * EXPECTED_LOGS_PER_TREE : 0;
-    pushDaily(revenueItems, `${tree.name} roots`, rootsQty * runs, price(prices, tree.rootsItem));
-    pushDaily(revenueItems, `${tree.name} logs`, logsQty * runs, price(prices, tree.logsItem));
+    pushDaily(
+      revenueItems,
+      `${tree.name} roots`,
+      rootsQty * runs,
+      price(prices, tree.rootsItem),
+      tree.rootsItem,
+    );
+    pushDaily(
+      revenueItems,
+      `${tree.name} logs`,
+      logsQty * runs,
+      price(prices, tree.logsItem),
+      tree.logsItem,
+    );
 
     drafts.push({
       kind: 'tree',
+      cropKey: cfg.treeType,
       label: `${tree.name} trees`,
       patches,
       runsPerDay: runs,
@@ -288,7 +318,7 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     const runs = cfg.hardwoodRunsPerDay;
 
     let cost = patches * price(prices, hw.seedItem);
-    pushDaily(costItems, `${hw.name} seeds`, patches * runs, price(prices, hw.seedItem));
+    pushDaily(costItems, `${hw.name} seeds`, patches * runs, price(prices, hw.seedItem), hw.seedItem);
 
     let demandValue = 0;
     if (cfg.hardwoodStrategy === 'pay') {
@@ -298,7 +328,13 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     } else if (tier !== 'none') {
       const unit = compostCost(prices, tier);
       cost += patches * unit;
-      pushDaily(costItems, `${COMPOST[tier].label} (${hw.name.toLowerCase()})`, patches * runs, unit);
+      pushDaily(
+        costItems,
+        `${COMPOST[tier].label} (${hw.name.toLowerCase()})`,
+        patches * runs,
+        unit,
+        COMPOST[tier].item ?? undefined,
+      );
     }
 
     const clear = clearing(patches);
@@ -312,10 +348,11 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
 
     // Hardwood trees have no roots item, so logs are all felling gives.
     const logsQty = chopping && cfg.sellHardwoodLogs ? survived * EXPECTED_LOGS_PER_TREE : 0;
-    pushDaily(revenueItems, `${hw.name} logs`, logsQty * runs, price(prices, hw.logsItem));
+    pushDaily(revenueItems, `${hw.name} logs`, logsQty * runs, price(prices, hw.logsItem), hw.logsItem);
 
     drafts.push({
       kind: 'hardwood',
+      cropKey: cfg.hardwoodType,
       label: `${hw.name} hardwood`,
       patches,
       runsPerDay: runs,
@@ -342,7 +379,13 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     const runs = cfg.fruitRunsPerDay;
 
     let cost = patches * price(prices, fruit.seedItem);
-    pushDaily(costItems, `${fruit.name} seeds`, patches * runs, price(prices, fruit.seedItem));
+    pushDaily(
+      costItems,
+      `${fruit.name} seeds`,
+      patches * runs,
+      price(prices, fruit.seedItem),
+      fruit.seedItem,
+    );
 
     let demandValue = 0;
     if (cfg.fruitStrategy === 'pay') {
@@ -352,7 +395,13 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     } else if (tier !== 'none') {
       const unit = compostCost(prices, tier);
       cost += patches * unit;
-      pushDaily(costItems, `${COMPOST[tier].label} (${fruit.name.toLowerCase()})`, patches * runs, unit);
+      pushDaily(
+        costItems,
+        `${COMPOST[tier].label} (${fruit.name.toLowerCase()})`,
+        patches * runs,
+        unit,
+        COMPOST[tier].item ?? undefined,
+      );
     }
 
     // Fruit is picked before the tree comes out, so clearing costs time or gp
@@ -370,6 +419,7 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
 
     drafts.push({
       kind: 'fruitTree',
+      cropKey: cfg.fruitType,
       label: fruit.name,
       patches,
       runsPerDay: runs,
@@ -396,18 +446,31 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     const harvested = herbSurvived * herbYieldPerPatch;
 
     let cost = herbPatches * price(prices, herb.seedItem);
-    pushDaily(costItems, `${herb.name} seeds`, herbPatches * runs, price(prices, herb.seedItem));
+    pushDaily(
+      costItems,
+      `${herb.name} seeds`,
+      herbPatches * runs,
+      price(prices, herb.seedItem),
+      herb.seedItem,
+    );
     if (cfg.herbCompost !== 'none') {
       const unit = compostCost(prices, cfg.herbCompost);
       cost += herbPatches * unit;
-      pushDaily(costItems, `${COMPOST[cfg.herbCompost].label} (herbs)`, herbPatches * runs, unit);
+      pushDaily(
+        costItems,
+        `${COMPOST[cfg.herbCompost].label} (herbs)`,
+        herbPatches * runs,
+        unit,
+        COMPOST[cfg.herbCompost].item ?? undefined,
+      );
     }
 
     const sold = cfg.sellHerbs ? harvested : 0;
-    pushDaily(revenueItems, herb.name, sold * runs, price(prices, herb.productItem));
+    pushDaily(revenueItems, herb.name, sold * runs, price(prices, herb.productItem), herb.productItem);
 
     drafts.push({
       kind: 'herb',
+      cropKey: cfg.herbType,
       label: herb.name,
       patches: herbPatches,
       runsPerDay: runs,
@@ -435,11 +498,11 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
 
     if (bought > 0) {
       paymentCostPerDay += bought * unit;
-      pushDaily(costItems, `${ITEM_NAMES[item]} bought (protection)`, bought, unit);
+      pushDaily(costItems, `${ITEM_NAMES[item]} bought (protection)`, bought, unit, item);
     }
     if (spare > 0 && cfg.sellSpareFruit) {
       spareRevenuePerDay += spare * unit;
-      pushDaily(revenueItems, `${ITEM_NAMES[item]} sold`, spare, unit);
+      pushDaily(revenueItems, `${ITEM_NAMES[item]} sold`, spare, unit, item);
     }
     produceFlow.push({ item, produced: grown, needed, bought, spare });
   }
@@ -458,6 +521,7 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
 
     return {
       kind: d.kind,
+      cropKey: d.cropKey,
       label: d.label,
       patches: d.patches,
       survival: d.survival,
@@ -622,6 +686,8 @@ export function project(cfg: Config, prices: PriceMap): Projection {
 export interface StrategyRow {
   strategy: Strategy;
   label: string;
+  /** What the strategy costs you in goods — null for no protection at all. */
+  item: ItemKey | null;
   survival: number;
   xpPerDay: number;
   netPerDay: number;
@@ -641,14 +707,14 @@ export function compareStrategies(cfg: Config, prices: PriceMap, kind: PatchKind
       ? ['ultracompost', 'supercompost', 'compost', 'none']
       : ['pay', 'ultracompost', 'supercompost', 'compost', 'none'];
 
-  const payLabel = () => {
+  const payment = () => {
     const def =
       kind === 'tree'
         ? TREES[cfg.treeType]
         : kind === 'hardwood'
           ? HARDWOOD_TREES[cfg.hardwoodType]
           : FRUIT_TREES[cfg.fruitType];
-    return `Pay ${def.payQty} ${ITEM_NAMES[def.payItem].toLowerCase()}`;
+    return { label: `Pay ${def.payQty} ${ITEM_NAMES[def.payItem].toLowerCase()}`, item: def.payItem };
   };
 
   return strategies.map((s) => {
@@ -662,9 +728,11 @@ export function compareStrategies(cfg: Config, prices: PriceMap, kind: PatchKind
             : { ...cfg, herbCompost: s as CompostTier };
     const p = project(variant, prices);
     const crop = p.day.crops.find((c) => c.kind === kind);
+    const paid = s === 'pay' ? payment() : null;
     return {
       strategy: s,
-      label: s === 'pay' ? payLabel() : COMPOST[s as CompostTier].label,
+      label: paid ? paid.label : COMPOST[s as CompostTier].label,
+      item: paid ? paid.item : COMPOST[s as CompostTier].item,
       survival: crop?.survival ?? 1,
       xpPerDay: p.day.xpPerDay,
       netPerDay: p.day.netPerDay,

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { Footer } from '@/components/footer';
 import { Nav } from '@/components/nav';
 import { PlannerProvider } from '@/components/planner-provider';
 import { DEFAULT_RSN, fetchHiscores } from '@/lib/hiscores';
@@ -39,6 +40,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         >
           <Nav />
           {children}
+          <Footer />
         </PlannerProvider>
       </body>
     </html>

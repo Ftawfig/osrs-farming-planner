@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { FarmingIcon } from '@/components/icon';
 
 const LINKS = [
   { href: '/', label: 'Planner' },
@@ -14,6 +15,7 @@ export function Nav() {
   return (
     <nav className="border-b border-white/10 bg-slate-950/40 backdrop-blur">
       <div className="mx-auto flex max-w-[1500px] items-center gap-1 px-4 lg:px-6">
+        <FarmingIcon size={18} className="mr-2" />
         {LINKS.map((l) => {
           const active = pathname === l.href;
           return (

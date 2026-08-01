@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 import {
   BankChart,
   CropEconomyChart,
@@ -10,6 +10,8 @@ import {
   XpProgressChart,
 } from '@/components/charts';
 import { Card, Field, NumberField, Select, Slider, Stat, Toggle } from '@/components/ui';
+import { CropIcon, FarmingIcon, ItemIcon } from '@/components/icon';
+import { OUTFIT_ICONS, SECATEURS_ICONS } from '@/lib/icons';
 import {
   CLEAR_PATCH_FEE,
   COMPOST,
@@ -46,6 +48,7 @@ import {
 import {
   Config,
   CropResult,
+  LineItem,
   StrategyRow,
   applyLevelGating,
   compareStrategies,
@@ -252,21 +255,29 @@ export default function Planner() {
   const advice = [
     {
       name: `${TREES[cfg.treeType].name} trees`,
+      kind: 'tree' as const,
+      cropKey: cfg.treeType as string,
       rows: treeRows,
       current: cfg.treeStrategy,
     },
     {
       name: `${HARDWOOD_TREES[cfg.hardwoodType].name} hardwood`,
+      kind: 'hardwood' as const,
+      cropKey: cfg.hardwoodType as string,
       rows: hardwoodRows,
       current: cfg.hardwoodStrategy,
     },
     {
       name: FRUIT_TREES[cfg.fruitType].name,
+      kind: 'fruitTree' as const,
+      cropKey: cfg.fruitType as string,
       rows: fruitRows,
       current: cfg.fruitStrategy,
     },
     {
       name: `${HERBS[cfg.herbType].name} herbs`,
+      kind: 'herb' as const,
+      cropKey: cfg.herbType as string,
       rows: herbRows,
       current: cfg.herbCompost,
     },
@@ -325,12 +336,15 @@ export default function Planner() {
   const hardwood = HARDWOOD_TREES[cfg.hardwoodType];
   const fruit = FRUIT_TREES[cfg.fruitType];
   const herb = HERBS[cfg.herbType];
+  // Bound here rather than indexed inline so the null case narrows away.
+  const secateursIcon = SECATEURS_ICONS[cfg.secateurs];
 
   return (
     <main className="mx-auto max-w-[1500px] px-4 py-6 lg:px-6">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-50">
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-50">
+            <FarmingIcon size={26} />
             OSRS Farming <span className="text-amber-400">99</span> Planner
           </h1>
           <p className="mt-1 text-sm text-slate-400">
@@ -364,7 +378,7 @@ export default function Planner() {
       <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
         {/* ---------------- Controls ---------------- */}
         <aside className="min-w-0 space-y-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
-          <Card title="Your account">
+          <Card title="Your account" icon={<FarmingIcon size={20} />}>
             <div className="mb-3">
               <Field label="OSRS character name" hint="pulls Farming XP">
                 <div className="flex gap-2">
@@ -397,7 +411,7 @@ export default function Planner() {
             </div>
 
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Level">
+              <Field label="Level" icon={<FarmingIcon size={14} />}>
                 <NumberField value={level} onChange={setLevel} min={1} max={99} />
               </Field>
               <Field label="% to next">
@@ -418,7 +432,8 @@ export default function Planner() {
                 />
               </Field>
             </div>
-            <p className="mt-2 text-[11px] tabular-nums text-slate-500">
+            <p className="mt-2 flex items-center gap-1.5 text-[11px] tabular-nums text-slate-500">
+              <FarmingIcon size={14} />
               {fmtNum(cfg.currentXp)} xp &middot; {fmtNum(proj.xpNeeded)} xp to {cfg.targetLevel}
             </p>
           </Card>
@@ -426,6 +441,7 @@ export default function Planner() {
           <Card
             title="Trees"
             subtitle={`${fmtNum(tree.checkXp, 1)} xp per check · ${growthLabel(tree.growthMinutes)}`}
+            icon={<CropIcon kind="tree" cropKey={cfg.treeType} name={`${tree.name} tree`} size={22} />}
             className={cfg.treeEnabled ? '' : 'opacity-60'}
             actions={
               <CropSwitch
@@ -501,6 +517,14 @@ export default function Planner() {
           <Card
             title="Hardwood trees"
             subtitle={`${fmtNum(hardwood.checkXp, 1)} xp per check · ${growthLabel(hardwood.growthMinutes)}`}
+            icon={
+              <CropIcon
+                kind="hardwood"
+                cropKey={cfg.hardwoodType}
+                name={`${hardwood.name} tree`}
+                size={22}
+              />
+            }
             className={cfg.hardwoodEnabled ? '' : 'opacity-60'}
             actions={
               <CropSwitch
@@ -553,6 +577,9 @@ export default function Planner() {
           <Card
             title="Fruit trees"
             subtitle={`${fmtNum(fruit.checkXp, 1)} xp per check · ${growthLabel(FRUIT_TREE_GROWTH_MINUTES)}`}
+            icon={
+              <CropIcon kind="fruitTree" cropKey={cfg.fruitType} name={`${fruit.name} tree`} size={22} />
+            }
             className={cfg.fruitEnabled ? '' : 'opacity-60'}
             actions={
               <CropSwitch
@@ -608,6 +635,7 @@ export default function Planner() {
           <Card
             title="Herbs"
             subtitle={`Herb patches cannot be paid for · ${growthLabel(HERB_GROWTH_MINUTES)}`}
+            icon={<CropIcon kind="herb" cropKey={cfg.herbType} name={herb.name} size={22} />}
             className={cfg.herbEnabled ? '' : 'opacity-60'}
             actions={
               <CropSwitch
@@ -662,7 +690,11 @@ export default function Planner() {
             )}
           </Card>
 
-          <Card title="Gear" subtitle={`+${proj.day.outfitBonusPct.toFixed(1)}% farming XP`}>
+          <Card
+            title="Gear"
+            subtitle={`+${proj.day.outfitBonusPct.toFixed(1)}% farming XP`}
+            icon={<ItemIcon item="jacket" name="Farmer's jacket" size={22} />}
+          >
             <div className="space-y-2">
               <Toggle
                 checked={fullOutfit}
@@ -678,12 +710,20 @@ export default function Planner() {
                     onChange={(b) => set('outfit', { ...cfg.outfit, [k]: b })}
                     label={OUTFIT_PIECES[k].label}
                     hint={`+${OUTFIT_PIECES[k].bonus}% xp`}
+                    icon={<ItemIcon item={OUTFIT_ICONS[k]} name={OUTFIT_PIECES[k].label} size={18} />}
                   />
                 ))}
               </div>
               <p className="px-0.5 text-[10px] text-slate-500">Wearing all four adds a further +0.5%.</p>
               <div className="pt-1">
-                <Field label="Secateurs">
+                <Field
+                  label="Secateurs"
+                  icon={
+                    secateursIcon && (
+                      <ItemIcon item={secateursIcon} name={SECATEURS[cfg.secateurs].label} size={16} />
+                    )
+                  }
+                >
                   <Select
                     value={cfg.secateurs}
                     onChange={(v) => set('secateurs', v)}
@@ -700,6 +740,7 @@ export default function Planner() {
 
           <Card
             title="GE prices"
+            icon={<ItemIcon item="coins" name="Coins" size={20} />}
             actions={
               <button
                 onClick={() => setShowPrices((s) => !s)}
@@ -710,18 +751,22 @@ export default function Planner() {
             }
           >
             {!showPrices ? (
-              <p className="text-xs leading-relaxed text-slate-400">
-                {ITEM_NAMES[tree.seedItem]}{' '}
-                <span className="tabular-nums text-slate-200">{fmtNum(prices[tree.seedItem] ?? 0)}</span>{' '}
-                &middot; {ITEM_NAMES[hardwood.seedItem]}{' '}
-                <span className="tabular-nums text-slate-200">{fmtNum(prices[hardwood.seedItem] ?? 0)}</span>{' '}
-                &middot; Ultracompost{' '}
-                <span className="tabular-nums text-slate-200">{fmtNum(prices.ultracompost ?? 0)}</span>
-              </p>
+              <div className="space-y-1">
+                {([tree.seedItem, hardwood.seedItem, 'ultracompost'] as ItemKey[]).map((k) => (
+                  <p key={k} className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <ItemIcon item={k} size={16} />
+                    <span className="truncate">{ITEM_NAMES[k]}</span>
+                    <span className="ml-auto shrink-0 tabular-nums text-slate-200">
+                      {fmtNum(prices[k] ?? 0)}
+                    </span>
+                  </p>
+                ))}
+              </div>
             ) : (
               <div className="space-y-2">
                 {priceKeysFor(cfg).map((k) => (
                   <div key={k} className="flex items-center gap-2">
+                    <ItemIcon item={k} size={18} />
                     <span className="flex-1 truncate text-xs text-slate-400">{ITEM_NAMES[k]}</span>
                     <div className="w-24">
                       <NumberField
@@ -762,11 +807,13 @@ export default function Planner() {
               value={`${fmtGp(-proj.totalNet)} gp`}
               sub={`${fmtGp(proj.day.netPerDay)} gp/day`}
               tone={proj.totalNet >= 0 ? 'good' : 'bad'}
+              icon={<ItemIcon item="coins" name="Coins" size={20} />}
             />
             <Stat
               label="XP per day"
               value={fmtGp(proj.day.xpPerDay)}
               sub={`${fmtGp(proj.xpPerHour)} xp/hr`}
+              icon={<FarmingIcon size={20} />}
             />
           </div>
 
@@ -775,9 +822,12 @@ export default function Planner() {
             subtitle="Cheapest and fastest protection per patch type, at current prices"
           >
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {advice.map(({ name, cheapest: cheap, fastest: fast, now }) => (
+              {advice.map(({ name, kind, cropKey, cheapest: cheap, fastest: fast, now }) => (
                 <div key={name} className="rounded-lg border border-white/10 bg-slate-950/50 p-3">
-                  <div className="mb-2 text-xs font-semibold text-slate-300">{name}</div>
+                  <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+                    <CropIcon kind={kind} cropKey={cropKey} name={name} size={18} />
+                    {name}
+                  </div>
                   <Recommendation
                     tag="Cheapest"
                     row={cheap}
@@ -856,6 +906,7 @@ export default function Planner() {
                 data={proj.day.crops.map((c) => ({
                   label: c.label,
                   kind: c.kind,
+                  cropKey: c.cropKey,
                   xp: c.xpPerDay,
                 }))}
               />
@@ -867,6 +918,8 @@ export default function Planner() {
               <CropEconomyChart
                 data={proj.day.crops.map((c) => ({
                   label: c.label,
+                  kind: c.kind,
+                  cropKey: c.cropKey,
                   cost: Math.round(c.costPerDay),
                   revenue: Math.round(c.revenuePerDay),
                 }))}
@@ -887,6 +940,7 @@ export default function Planner() {
             <Card
               title={`${tree.name} tree strategies`}
               subtitle="Whole-day totals, everything else held equal"
+              icon={<CropIcon kind="tree" cropKey={cfg.treeType} name={`${tree.name} tree`} size={20} />}
             >
               <StrategyChart rows={treeRows} highlight={cfg.treeStrategy} />
               <StrategyTable rows={treeRows} current={cfg.treeStrategy} />
@@ -894,11 +948,25 @@ export default function Planner() {
             <Card
               title={`${hardwood.name} strategies`}
               subtitle="Whole-day totals, everything else held equal"
+              icon={
+                <CropIcon
+                  kind="hardwood"
+                  cropKey={cfg.hardwoodType}
+                  name={`${hardwood.name} tree`}
+                  size={20}
+                />
+              }
             >
               <StrategyChart rows={hardwoodRows} highlight={cfg.hardwoodStrategy} />
               <StrategyTable rows={hardwoodRows} current={cfg.hardwoodStrategy} />
             </Card>
-            <Card title={`${fruit.name} strategies`} subtitle="Whole-day totals, everything else held equal">
+            <Card
+              title={`${fruit.name} strategies`}
+              subtitle="Whole-day totals, everything else held equal"
+              icon={
+                <CropIcon kind="fruitTree" cropKey={cfg.fruitType} name={`${fruit.name} tree`} size={20} />
+              }
+            >
               <StrategyChart rows={fruitRows} highlight={cfg.fruitStrategy} />
               <StrategyTable rows={fruitRows} current={cfg.fruitStrategy} />
             </Card>
@@ -917,6 +985,7 @@ export default function Planner() {
                         key={p.item}
                         className="rounded-md border border-white/10 bg-slate-950/50 px-3 py-2 text-[11px] text-slate-400"
                       >
+                        <ItemIcon item={p.item} size={16} className="mr-1.5 -mt-0.5 inline-block align-middle" />
                         <span className="text-slate-200">{ITEM_NAMES[p.item]}</span>: {fmtNum(p.produced, 1)}
                         /day grown, {fmtNum(p.needed, 1)}/day owed &rarr;{' '}
                         {p.bought > 0 ? (
@@ -1059,7 +1128,7 @@ interface CropColumn {
   /** Which way to sort when this column is first clicked. */
   defaultDir: SortDir;
   sortValue: (c: CropResult) => number | string;
-  render: (c: CropResult) => string;
+  render: (c: CropResult) => ReactNode;
   /** Extra classes for the body cell, e.g. profit colouring. */
   cellClass?: (c: CropResult) => string;
   /** Overall row value; crops on different cadences can't always be totalled. */
@@ -1113,7 +1182,12 @@ function CropTable({
       align: 'left',
       defaultDir: 'asc',
       sortValue: (c) => c.label,
-      render: (c) => c.label,
+      render: (c) => (
+        <span className="flex items-center gap-1.5">
+          <CropIcon kind={c.kind} cropKey={c.cropKey} name={c.label} size={18} />
+          {c.label}
+        </span>
+      ),
       total: 'Overall',
     },
     {
@@ -1347,7 +1421,13 @@ function StrategyTable({ rows, current }: { rows: StrategyRow[]; current: Strate
                     : 'text-slate-300'
               }`}
             >
-              <td className="py-1">{r.label}</td>
+              <td className="py-1">
+                <span className="flex items-center gap-1.5">
+                  {/* No protection costs nothing, so there is nothing to show. */}
+                  {r.item ? <ItemIcon item={r.item} size={16} /> : <span className="w-4" />}
+                  {r.label}
+                </span>
+              </td>
               <td className="py-1 text-right">{(r.survival * 100).toFixed(1)}%</td>
               <td className="py-1 text-right">{fmtGp(r.xpPerDay)}</td>
               <td className="py-1 text-right">{fmtNum(r.daysToTarget, 1)}</td>
@@ -1360,15 +1440,7 @@ function StrategyTable({ rows, current }: { rows: StrategyRow[]; current: Strate
   );
 }
 
-function LineItems({
-  title,
-  items,
-  tone,
-}: {
-  title: string;
-  items: { label: string; qty: number; unit: number; total: number }[];
-  tone: string;
-}) {
+function LineItems({ title, items, tone }: { title: string; items: LineItem[]; tone: string }) {
   const total = items.reduce((s, i) => s + i.total, 0);
   return (
     <div>
@@ -1380,7 +1452,19 @@ function LineItems({
         <tbody>
           {items.map((i) => (
             <tr key={i.label} className="border-t border-white/5 text-slate-400">
-              <td className="py-1 pr-2">{i.label}</td>
+              {/* w-full + max-w-0 hands this cell whatever the numeric columns
+                  leave and lets the label truncate inside it, rather than
+                  widening the table until it escapes the card. */}
+              <td className="w-full max-w-0 py-1 pr-2">
+                <span className="flex items-center gap-1.5">
+                  {/* Clearing a patch is a flat fee with nothing to show for it,
+                      so coins stand in wherever there is no item. */}
+                  <ItemIcon item={i.item ?? 'coins'} size={16} />
+                  <span className="truncate" title={i.label}>
+                    {i.label}
+                  </span>
+                </span>
+              </td>
               <td className="py-1 text-right text-slate-500">
                 {fmtNum(i.qty, i.qty % 1 === 0 ? 0 : 1)} &times; {fmtNum(i.unit)}
               </td>

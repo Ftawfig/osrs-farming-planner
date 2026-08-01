@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, Field, Select } from '@/components/ui';
+import { CropIcon, FarmingIcon } from '@/components/icon';
 import { usePlanner } from '@/components/planner-provider';
 import { PatchKind, Strategy, levelForXp } from '@/lib/gameData';
 import { CropOption, compareCrops, fmtGp, fmtNum } from '@/lib/model';
@@ -123,7 +124,10 @@ export default function CropCompare() {
     <main className="mx-auto max-w-[1500px] px-4 py-6 lg:px-6">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-50">Crop rates</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-50">
+            <FarmingIcon size={26} />
+            Crop rates
+          </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Every crop costed on its own — a single patch, run at the cadence its growth time allows. Figures
             are per patch, so they compare cleanly regardless of how many you actually farm.
@@ -147,8 +151,18 @@ export default function CropCompare() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         {tables.map((t) => (
-          <Card key={t.kind} title={t.title} subtitle={t.note}>
-            <CropTable rows={t.rows} selected={picks[t.kind]} onChoose={(key) => choose(t.kind, key)} />
+          <Card
+            key={t.kind}
+            title={t.title}
+            subtitle={t.note}
+            icon={<CropIcon kind={t.kind} cropKey={picks[t.kind]} size={22} />}
+          >
+            <CropTable
+              kind={t.kind}
+              rows={t.rows}
+              selected={picks[t.kind]}
+              onChoose={(key) => choose(t.kind, key)}
+            />
           </Card>
         ))}
       </div>
@@ -157,10 +171,12 @@ export default function CropCompare() {
 }
 
 function CropTable({
+  kind,
   rows,
   selected,
   onChoose,
 }: {
+  kind: PatchKind;
   rows: CropOption[];
   selected: string;
   onChoose: (key: string) => void;
@@ -264,8 +280,19 @@ function CropTable({
                   if (c.key === 'name') {
                     return (
                       <td key={c.key} className="py-2 pr-2 text-left font-medium">
-                        <span className={r.unlocked ? 'text-slate-200' : ''}>{r.name}</span>
-                        {!r.unlocked && <span className="ml-1 text-[11px] text-slate-600">locked</span>}
+                        <span className="flex items-center gap-2">
+                          {/* Dimmed to match the row, so a locked crop still
+                              reads as out of reach at a glance. */}
+                          <CropIcon
+                            kind={kind}
+                            cropKey={r.key}
+                            name={r.name}
+                            size={20}
+                            className={r.unlocked ? '' : 'opacity-40 grayscale'}
+                          />
+                          <span className={r.unlocked ? 'text-slate-200' : ''}>{r.name}</span>
+                          {!r.unlocked && <span className="text-[11px] text-slate-600">locked</span>}
+                        </span>
                       </td>
                     );
                   }

@@ -8,12 +8,15 @@ export function Card({
   children,
   className = '',
   actions,
+  icon,
 }: {
   title?: string;
   subtitle?: string;
   children: ReactNode;
   className?: string;
   actions?: ReactNode;
+  /** Sits left of the title — usually the sprite of whatever the card is about. */
+  icon?: ReactNode;
 }) {
   return (
     <section
@@ -21,11 +24,14 @@ export function Card({
     >
       {(title || actions) && (
         <header className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            {title && (
-              <h2 className="text-sm font-semibold tracking-wide text-amber-300/90 uppercase">{title}</h2>
-            )}
-            {subtitle && <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>}
+          <div className="flex min-w-0 items-start gap-2">
+            {icon}
+            <div className="min-w-0">
+              {title && (
+                <h2 className="text-sm font-semibold tracking-wide text-amber-300/90 uppercase">{title}</h2>
+              )}
+              {subtitle && <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>}
+            </div>
           </div>
           {actions}
         </header>
@@ -40,11 +46,14 @@ export function Stat({
   value,
   sub,
   tone = 'default',
+  icon,
 }: {
   label: string;
   value: string;
   sub?: string;
   tone?: 'default' | 'good' | 'bad' | 'gold';
+  /** Reads as a unit marker on the figure — a coin pile, the Farming icon. */
+  icon?: ReactNode;
 }) {
   const toneClass = {
     default: 'text-slate-100',
@@ -55,17 +64,33 @@ export function Stat({
   return (
     <div className="rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2.5">
       <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">{label}</div>
-      <div className={`mt-1 text-xl font-semibold tabular-nums ${toneClass}`}>{value}</div>
+      <div className="mt-1 flex items-center gap-1.5">
+        {icon}
+        <span className={`text-xl font-semibold tabular-nums ${toneClass}`}>{value}</span>
+      </div>
       {sub && <div className="mt-0.5 text-[11px] text-slate-500">{sub}</div>}
     </div>
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({
+  label,
+  hint,
+  children,
+  icon,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+  icon?: ReactNode;
+}) {
   return (
     <label className="block">
       <span className="mb-1 flex items-baseline justify-between gap-2">
-        <span className="text-xs font-medium text-slate-300">{label}</span>
+        <span className="flex items-center gap-1 text-xs font-medium text-slate-300">
+          {icon}
+          {label}
+        </span>
         {hint && <span className="text-[10px] text-slate-500">{hint}</span>}
       </span>
       {children}
@@ -214,12 +239,15 @@ export function Toggle({
   label,
   hint,
   disabled = false,
+  icon,
 }: {
   checked: boolean;
   onChange: (b: boolean) => void;
   label: string;
   hint?: string;
   disabled?: boolean;
+  /** Sits between the switch and the label — the piece of gear being worn. */
+  icon?: ReactNode;
 }) {
   return (
     <button
@@ -239,6 +267,7 @@ export function Toggle({
           className={`absolute top-0.5 h-3 w-3 rounded-full bg-slate-950 transition ${checked && !disabled ? 'left-3.5' : 'left-0.5'}`}
         />
       </span>
+      {icon}
       <span className="min-w-0">
         <span className="block text-xs font-medium text-slate-200">{label}</span>
         {hint && <span className="block text-[10px] text-slate-500">{hint}</span>}

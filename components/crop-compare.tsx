@@ -154,7 +154,7 @@ export default function CropCompare({
         </div>
       </header>
 
-      <p className="mb-4 rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-[11px] text-slate-400">
+      <p className="mb-4 rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-400">
         Rated at Farming level <span className="text-amber-300">{level}</span>
         {initialPlayer && ` (${initialPlayer.name})`}. Crops above your level are greyed out — they still show
         their rates so you can see what is worth training towards.{' '}
@@ -217,7 +217,7 @@ function CropTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] text-[11px] tabular-nums">
+      <table className="w-full min-w-[640px] text-[13px] tabular-nums">
         <thead>
           <tr className="text-slate-500">
             {COLUMNS.map((c) => {
@@ -227,7 +227,7 @@ function CropTable({
                   key={c.key}
                   scope="col"
                   aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  className={`pb-1.5 font-medium ${c.align === 'left' ? 'text-left' : 'text-right'}`}
+                  className={`pb-2 text-xs font-medium ${c.align === 'left' ? 'text-left' : 'text-right'}`}
                 >
                   <button
                     type="button"
@@ -281,14 +281,14 @@ function CropTable({
 
                   if (c.key === 'name') {
                     return (
-                      <td key={c.key} className="py-1.5 pr-2 text-left font-medium">
+                      <td key={c.key} className="py-2 pr-2 text-left font-medium">
                         <span className={r.unlocked ? 'text-slate-200' : ''}>{r.name}</span>
-                        {!r.unlocked && <span className="ml-1 text-[10px] text-slate-600">locked</span>}
+                        {!r.unlocked && <span className="ml-1 text-[11px] text-slate-600">locked</span>}
                       </td>
                     );
                   }
                   return (
-                    <td key={c.key} className={`py-1.5 text-right ${highlight} ${money}`}>
+                    <td key={c.key} className={`py-2 text-right ${highlight} ${money}`}>
                       {c.render(r)}
                     </td>
                   );
@@ -298,7 +298,7 @@ function CropTable({
           })}
         </tbody>
       </table>
-      <p className="mt-2 text-[10px] text-slate-600">
+      <p className="mt-2 text-[11px] text-slate-600">
         Gold = most XP a day. Green = cheapest XP. Both ignore crops above your level.
       </p>
     </div>

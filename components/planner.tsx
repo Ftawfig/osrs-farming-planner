@@ -824,7 +824,13 @@ export default function Planner() {
             title="Per-crop metrics"
             subtitle="Each patch type on its own cadence, after disease and the outfit bonus"
           >
-            <CropTable crops={proj.day.crops} />
+            <CropTable
+              crops={proj.day.crops}
+              xpToNextLevel={level < 99 ? Math.max(0, xpForLevel(level + 1) - cfg.currentXp) : 0}
+              xpToTarget={proj.xpNeeded}
+              nextLevel={level < 99 ? level + 1 : null}
+              targetLevel={cfg.targetLevel}
+            />
           </Card>
 
           <div className="grid gap-4 xl:grid-cols-2">
@@ -1044,7 +1050,19 @@ function RunsPerDayField({
 }
 
 /** Expected XP and P/L, broken out per patch type, per run and per day. */
-function CropTable({ crops }: { crops: CropResult[] }) {
+function CropTable({
+  crops,
+  xpToNextLevel,
+  xpToTarget,
+  nextLevel,
+  targetLevel,
+}: {
+  crops: CropResult[];
+  xpToNextLevel: number;
+  xpToTarget: number;
+  nextLevel: number | null;
+  targetLevel: number;
+}) {
   const total = crops.reduce(
     (a, c) => ({
       xpPerDay: a.xpPerDay + c.xpPerDay,
@@ -1058,9 +1076,13 @@ function CropTable({ crops }: { crops: CropResult[] }) {
   const cell = 'py-1.5 text-right';
   const money = (n: number) => (n >= 0 ? 'text-emerald-400' : 'text-rose-400');
 
+  /** Runs of this crop alone to cover a given XP gap. */
+  const runsFor = (xpGap: number, xpPerRun: number) =>
+    xpPerRun > 0 && xpGap > 0 ? fmtNum(xpGap / xpPerRun, 1) : '—';
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] text-[11px] tabular-nums">
+      <table className="w-full min-w-[900px] text-[11px] tabular-nums">
         <thead>
           <tr className="text-slate-500">
             <th className="pb-1.5 text-left font-medium">Crop</th>
@@ -1073,6 +1095,8 @@ function CropTable({ crops }: { crops: CropResult[] }) {
             <th className="pb-1.5 text-right font-medium">Cost / run</th>
             <th className="pb-1.5 text-right font-medium">Net / run</th>
             <th className="pb-1.5 text-right font-medium">Net / day</th>
+            <th className="pb-1.5 text-right font-medium">Runs &rarr; {nextLevel ?? 'next'}</th>
+            <th className="pb-1.5 text-right font-medium">Runs &rarr; {targetLevel}</th>
           </tr>
         </thead>
         <tbody>
@@ -1088,6 +1112,8 @@ function CropTable({ crops }: { crops: CropResult[] }) {
               <td className={`${cell} text-rose-400`}>{fmtGp(c.costPerRun)}</td>
               <td className={`${cell} ${money(c.netPerRun)}`}>{fmtGp(c.netPerRun)}</td>
               <td className={`${cell} ${money(c.netPerDay)}`}>{fmtGp(c.netPerDay)}</td>
+              <td className={cell}>{runsFor(xpToNextLevel, c.xpPerRun)}</td>
+              <td className={cell}>{runsFor(xpToTarget, c.xpPerRun)}</td>
             </tr>
           ))}
           <tr className="border-t-2 border-white/15 font-semibold text-slate-100">
@@ -1101,9 +1127,15 @@ function CropTable({ crops }: { crops: CropResult[] }) {
             <td className={`${cell} text-rose-400`}>{fmtGp(total.costPerDay)}</td>
             <td className={cell}>—</td>
             <td className={`${cell} ${money(total.netPerDay)}`}>{fmtGp(total.netPerDay)}</td>
+            <td className={cell}>—</td>
+            <td className={cell}>—</td>
           </tr>
         </tbody>
       </table>
+      <p className="mt-2 text-[10px] text-slate-600">
+        Run counts are for that crop on its own — how many runs it would take if nothing else were planted.
+        Running them together is what the days figures above describe, so the columns do not total.
+      </p>
     </div>
   );
 }

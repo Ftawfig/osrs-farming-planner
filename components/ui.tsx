@@ -133,36 +133,57 @@ export function NumberField({
   );
 }
 
+/** Half the native range thumb, used to keep the bubble centred on it. */
+const THUMB_RADIUS_PX = 7;
+
 export function Slider({
   value,
   onChange,
   min,
   max,
   step = 1,
-  suffix,
 }: {
   value: number;
   onChange: (n: number) => void;
   min: number;
   max: number;
   step?: number;
-  suffix?: string;
 }) {
+  const [showValue, setShowValue] = useState(false);
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+
   return (
-    <div className="flex items-center gap-2.5">
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-slate-700 accent-amber-400"
-      />
-      <span className="w-11 shrink-0 rounded border border-white/10 bg-slate-950/70 px-1 py-0.5 text-center text-xs tabular-nums text-amber-300">
-        {value}
-        {suffix}
-      </span>
+    <div className="flex items-center gap-1.5">
+      <span className="shrink-0 text-[10px] tabular-nums text-slate-500">{min}</span>
+      <div className="relative flex-1">
+        <span
+          aria-hidden
+          // The track runs thumb-width shorter than the element, so nudge the
+          // bubble back towards centre to stay over the thumb at both ends.
+          style={{ left: `calc(${pct}% + ${((50 - pct) / 50) * THUMB_RADIUS_PX}px)` }}
+          className={`pointer-events-none absolute -top-6 z-10 -translate-x-1/2 rounded border border-white/15 bg-slate-800 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-300 shadow-lg transition-opacity ${
+            showValue ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {value}
+        </span>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          onPointerDown={() => setShowValue(true)}
+          onPointerUp={() => setShowValue(false)}
+          onMouseEnter={() => setShowValue(true)}
+          onMouseLeave={() => setShowValue(false)}
+          onFocus={() => setShowValue(true)}
+          onBlur={() => setShowValue(false)}
+          className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-700 accent-amber-400"
+        />
+      </div>
+      <span className="shrink-0 text-[10px] tabular-nums text-slate-500">{max}</span>
     </div>
   );
 }

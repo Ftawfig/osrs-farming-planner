@@ -463,7 +463,7 @@ export default function Planner({
                   <Select value={cfg.treeType} onChange={setTreeType} options={treeOptions} />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Patches" hint={`0–${MAX_PATCHES.tree}`}>
+                  <Field label="Patches" hint={`${cfg.treePatches} selected`}>
                     <Slider
                       value={cfg.treePatches}
                       onChange={(v) => set('treePatches', v)}
@@ -538,7 +538,7 @@ export default function Planner({
                   <Select value={cfg.hardwoodType} onChange={setHardwoodType} options={hardwoodOptions} />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Patches" hint={`0–${MAX_PATCHES.hardwood}`}>
+                  <Field label="Patches" hint={`${cfg.hardwoodPatches} selected`}>
                     <Slider
                       value={cfg.hardwoodPatches}
                       onChange={(v) => set('hardwoodPatches', v)}
@@ -594,7 +594,7 @@ export default function Planner({
                   />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Patches" hint={`0–${MAX_PATCHES.fruitTree}`}>
+                  <Field label="Patches" hint={`${cfg.fruitPatches} selected`}>
                     <Slider
                       value={cfg.fruitPatches}
                       onChange={(v) => set('fruitPatches', v)}
@@ -645,7 +645,7 @@ export default function Planner({
                   <Select value={cfg.herbType} onChange={(v) => set('herbType', v)} options={herbOptions} />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Patches" hint={`0–${MAX_PATCHES.herb}`}>
+                  <Field label="Patches" hint={`${cfg.herbPatches} selected`}>
                     <Slider
                       value={cfg.herbPatches}
                       onChange={(v) => set('herbPatches', v)}

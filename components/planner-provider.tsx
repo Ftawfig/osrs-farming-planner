@@ -1,6 +1,16 @@
 'use client';
 
-import { Dispatch, ReactNode, SetStateAction, createContext, useContext, useMemo, useState } from 'react';
+import {
+  Dispatch,
+  ReactNode,
+  SetStateAction,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { FruitTreeKey, HardwoodKey, HerbKey, PatchKind, TreeKey, levelForXp } from '@/lib/gameData';
 import {
   Config,
@@ -11,6 +21,7 @@ import {
   applyLevelGating,
   fmtNum,
 } from '@/lib/model';
+import { getServerSnapshot, getSnapshot, savePlan, subscribe, toSettings } from '@/lib/plan-store';
 import type { Player } from '@/lib/hiscores';
 import type { PricePayload } from '@/lib/prices';
 
@@ -51,6 +62,10 @@ export const playerSummary = (p: Player) => `${p.name}: level ${p.level} (${fmtN
  * This lives in the root layout, which Next keeps mounted across client-side
  * navigation — so flipping between the planner and the rates page no longer
  * throws the whole setup away.
+ *
+ * Selections and the character name are persisted to local storage and survive
+ * a reload. XP is not: it is re-read from the hiscores each load, so the plan
+ * never runs on a stale level.
  */
 export function PlannerProvider({
   children,
@@ -63,24 +78,36 @@ export function PlannerProvider({
   initialPlayer: Player | null;
   defaultRsn: string;
 }) {
-  const [cfg, setCfgState] = useState<Config>(() => {
-    const base = initialPlayer ? { ...DEFAULT_CONFIG, currentXp: initialPlayer.xp } : DEFAULT_CONFIG;
-    return applyLevelGating(base);
-  });
+  // Settings come from the persisted store; SSR and hydration see the defaults,
+  // then React re-renders with whatever local storage held.
+  const plan = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const rsn = plan.rsn || defaultRsn;
+
+  const [currentXp, setCurrentXp] = useState(initialPlayer?.xp ?? DEFAULT_CONFIG.currentXp);
   const [live, setLive] = useState<PriceMap>(initialPrices.prices);
   const [overrides, setOverrides] = useState<PriceMap>({});
   const [priceMeta, setPriceMeta] = useState({
     source: initialPrices.source as string,
     fetchedAt: initialPrices.fetchedAt,
   });
-  const [rsn, setRsn] = useState(defaultRsn);
   const [rsnStatus, setRsnStatus] = useState<RsnStatus>(
     initialPlayer ? { kind: 'ok', msg: playerSummary(initialPlayer) } : { kind: 'idle' },
   );
 
+  // Gated here so a plan saved at a higher level still resolves to something
+  // plantable, while the stored choice returns once the level catches up.
+  const cfg = useMemo(() => applyLevelGating({ ...plan.settings, currentXp }), [plan.settings, currentXp]);
+
   const prices: PriceMap = useMemo(() => ({ ...live, ...overrides }), [live, overrides]);
 
-  const setCfg = (update: (c: Config) => Config) => setCfgState((c) => update(c));
+  const commit = (next: Config, nextRsn = rsn) => {
+    setCurrentXp(next.currentXp);
+    savePlan({ settings: toSettings(next), rsn: nextRsn });
+  };
+
+  const setCfg = (update: (c: Config) => Config) => commit(update(cfg));
+
+  const setRsn = (next: string) => savePlan({ settings: toSettings(cfg), rsn: next });
 
   const chooseCrop = (kind: PatchKind, key: string) => {
     const selection: CropSelection =
@@ -91,8 +118,34 @@ export function PlannerProvider({
           : kind === 'fruitTree'
             ? { fruitType: key as FruitTreeKey }
             : { herbType: key as HerbKey };
-    setCfgState((c) => applyLevelGating(applyCropSelection(c, selection)));
+    commit(applyLevelGating(applyCropSelection(cfg, selection)));
   };
+
+  // A restored character name the server did not look up needs its own fetch.
+  // Nothing is set before the first await, so this does not cascade renders.
+  useEffect(() => {
+    if (!plan.rsn || plan.rsn === defaultRsn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/hiscores?player=${encodeURIComponent(plan.rsn)}`);
+        const json = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setRsnStatus({ kind: 'error', msg: json.error ?? 'Lookup failed.' });
+          return;
+        }
+        const player = json as Player;
+        setCurrentXp(player.xp);
+        setRsnStatus({ kind: 'ok', msg: playerSummary(player) });
+      } catch {
+        if (!cancelled) setRsnStatus({ kind: 'error', msg: 'Lookup failed.' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [plan.rsn, defaultRsn]);
 
   const value: PlannerState = {
     cfg,

@@ -33,8 +33,14 @@ two keeps your whole setup — patches, protection, cadence, gear, price overrid
 currently set to, and clicking a row swaps just that crop, re-deriving its
 cadence from growth time and level-gating it against the loaded account.
 
-State is per session: a full page reload starts fresh from the account's
-hiscores.
+Selections and the character name persist to local storage and survive a reload.
+**XP deliberately does not** — it is a fact about the account rather than a
+choice, so it is re-read from the hiscores every load and the plan never runs on
+a stale level. `lib/plan-store.ts` holds the persisted slice, typed as
+`Omit<Config, 'currentXp'>` so XP cannot leak into it by accident.
+
+If the restored name is not the one the server looked up, the provider fetches
+that account's XP itself on mount.
 
 ## Clearing a patch
 

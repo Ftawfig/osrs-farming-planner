@@ -77,6 +77,8 @@ const SECATEURS_OPTIONS = (Object.keys(SECATEURS) as SecateursKey[]).map((k) => 
 
 const OUTFIT_KEYS = Object.keys(OUTFIT_PIECES) as OutfitPiece[];
 
+type SortDir = 'asc' | 'desc';
+
 /** Header control that drops a patch type from the model, or brings it back. */
 function CropSwitch({ enabled, onToggle, name }: { enabled: boolean; onToggle: () => void; name: string }) {
   return (
@@ -826,8 +828,8 @@ export default function Planner() {
           >
             <CropTable
               crops={proj.day.crops}
-              xpToNextLevel={level < 99 ? Math.max(0, xpForLevel(level + 1) - cfg.currentXp) : 0}
-              xpToTarget={proj.xpNeeded}
+              daysToNextLevel={proj.daysToNextLevel}
+              daysToTarget={proj.daysNeeded}
               nextLevel={level < 99 ? level + 1 : null}
               targetLevel={cfg.targetLevel}
             />
@@ -1050,91 +1052,270 @@ function RunsPerDayField({
 }
 
 /** Expected XP and P/L, broken out per patch type, per run and per day. */
+interface CropColumn {
+  key: string;
+  label: string;
+  align: 'left' | 'right';
+  /** Which way to sort when this column is first clicked. */
+  defaultDir: SortDir;
+  sortValue: (c: CropResult) => number | string;
+  render: (c: CropResult) => string;
+  /** Extra classes for the body cell, e.g. profit colouring. */
+  cellClass?: (c: CropResult) => string;
+  /** Overall row value; crops on different cadences can't always be totalled. */
+  total: string;
+}
+
 function CropTable({
   crops,
-  xpToNextLevel,
-  xpToTarget,
+  daysToNextLevel,
+  daysToTarget,
   nextLevel,
   targetLevel,
 }: {
   crops: CropResult[];
-  xpToNextLevel: number;
-  xpToTarget: number;
+  daysToNextLevel: number;
+  daysToTarget: number;
   nextLevel: number | null;
   targetLevel: number;
 }) {
+  const [sortKey, setSortKey] = useState('xpPerDay');
+  const [dir, setDir] = useState<SortDir>('desc');
+
+  const money = (n: number) => (n >= 0 ? 'text-emerald-400' : 'text-rose-400');
+
+  /**
+   * Runs of this crop you actually make over that stretch of the plan — its own
+   * cadence times the elapsed days, so the columns agree with the days figures
+   * above and total across crops.
+   */
+  const runsIn = (days: number, crop: CropResult) =>
+    crop.patches > 0 && Number.isFinite(days) ? days * crop.runsPerDay : 0;
+  const totalRunsIn = (days: number) =>
+    Number.isFinite(days) ? crops.reduce((s, c) => s + runsIn(days, c), 0) : NaN;
+
   const total = crops.reduce(
     (a, c) => ({
       xpPerDay: a.xpPerDay + c.xpPerDay,
-      costPerDay: a.costPerDay + c.costPerDay,
       netPerDay: a.netPerDay + c.netPerDay,
       patches: a.patches + c.patches,
     }),
-    { xpPerDay: 0, costPerDay: 0, netPerDay: 0, patches: 0 },
+    { xpPerDay: 0, netPerDay: 0, patches: 0 },
   );
 
-  const cell = 'py-1.5 text-right';
-  const money = (n: number) => (n >= 0 ? 'text-emerald-400' : 'text-rose-400');
+  const runsCell = (days: number) => (c: CropResult) =>
+    c.patches > 0 && Number.isFinite(days) ? fmtNum(runsIn(days, c), 1) : '—';
 
-  /** Runs of this crop alone to cover a given XP gap. */
-  const runsFor = (xpGap: number, xpPerRun: number) =>
-    xpPerRun > 0 && xpGap > 0 ? fmtNum(xpGap / xpPerRun, 1) : '—';
+  const columns: CropColumn[] = [
+    {
+      key: 'label',
+      label: 'Crop',
+      align: 'left',
+      defaultDir: 'asc',
+      sortValue: (c) => c.label,
+      render: (c) => c.label,
+      total: 'Overall',
+    },
+    {
+      key: 'patches',
+      label: 'Patches',
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => c.patches,
+      render: (c) => String(c.patches),
+      total: String(total.patches),
+    },
+    {
+      key: 'runsPerDay',
+      label: 'Runs / day',
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => c.runsPerDay,
+      render: (c) => (c.runsPerDay < 1 ? c.runsPerDay.toFixed(2) : fmtNum(c.runsPerDay, 1)),
+      total: '—',
+    },
+    {
+      key: 'survival',
+      label: 'Survive',
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => c.survival,
+      render: (c) => `${(c.survival * 100).toFixed(1)}%`,
+      total: '—',
+    },
+    {
+      key: 'xpPerRun',
+      label: 'XP / run',
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => c.xpPerRun,
+      render: (c) => fmtNum(c.xpPerRun),
+      cellClass: () => 'text-amber-300',
+      total: '—',
+    },
+    {
+      key: 'xpPerPlant',
+      label: 'XP / plant',
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => (c.patches > 0 ? c.xpPerRun / c.patches : 0),
+      render: (c) => fmtNum(c.patches > 0 ? c.xpPerRun / c.patches : 0),
+      total: '—',
+    },
+    {
+      key: 'xpPerDay',
+      label: 'XP / day',
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => c.xpPerDay,
+      render: (c) => fmtNum(c.xpPerDay),
+      cellClass: () => 'text-amber-300',
+      total: fmtNum(total.xpPerDay),
+    },
+    {
+      key: 'costPerRun',
+      label: 'Cost / run',
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => c.costPerRun,
+      render: (c) => fmtGp(c.costPerRun),
+      cellClass: () => 'text-rose-400',
+      total: '—',
+    },
+    {
+      key: 'netPerRun',
+      label: 'Net / run',
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => c.netPerRun,
+      render: (c) => fmtGp(c.netPerRun),
+      cellClass: (c) => money(c.netPerRun),
+      total: '—',
+    },
+    {
+      key: 'netPerDay',
+      label: 'Net / day',
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => c.netPerDay,
+      render: (c) => fmtGp(c.netPerDay),
+      cellClass: (c) => money(c.netPerDay),
+      total: fmtGp(total.netPerDay),
+    },
+    {
+      key: 'runsToNext',
+      label: `Runs → ${nextLevel ?? 'next'}`,
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => runsIn(daysToNextLevel, c),
+      render: runsCell(daysToNextLevel),
+      total: Number.isFinite(totalRunsIn(daysToNextLevel)) ? fmtNum(totalRunsIn(daysToNextLevel), 1) : '—',
+    },
+    {
+      key: 'runsToTarget',
+      label: `Runs → ${targetLevel}`,
+      align: 'right',
+      defaultDir: 'desc',
+      sortValue: (c) => runsIn(daysToTarget, c),
+      render: runsCell(daysToTarget),
+      total: Number.isFinite(totalRunsIn(daysToTarget)) ? fmtNum(totalRunsIn(daysToTarget), 1) : '—',
+    },
+  ];
+
+  const column = columns.find((c) => c.key === sortKey) ?? columns[0];
+  const sorted = [...crops].sort((a, b) => {
+    const factor = dir === 'asc' ? 1 : -1;
+    const av = column.sortValue(a);
+    const bv = column.sortValue(b);
+    if (typeof av === 'string' || typeof bv === 'string') {
+      return String(av).localeCompare(String(bv)) * factor;
+    }
+    return (av - bv) * factor;
+  });
+
+  const onSort = (c: CropColumn) => {
+    if (c.key === sortKey) setDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortKey(c.key);
+      setDir(c.defaultDir);
+    }
+  };
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[900px] text-[11px] tabular-nums">
         <thead>
           <tr className="text-slate-500">
-            <th className="pb-1.5 text-left font-medium">Crop</th>
-            <th className="pb-1.5 text-right font-medium">Patches</th>
-            <th className="pb-1.5 text-right font-medium">Runs / day</th>
-            <th className="pb-1.5 text-right font-medium">Survive</th>
-            <th className="pb-1.5 text-right font-medium">XP / run</th>
-            <th className="pb-1.5 text-right font-medium">XP / plant</th>
-            <th className="pb-1.5 text-right font-medium">XP / day</th>
-            <th className="pb-1.5 text-right font-medium">Cost / run</th>
-            <th className="pb-1.5 text-right font-medium">Net / run</th>
-            <th className="pb-1.5 text-right font-medium">Net / day</th>
-            <th className="pb-1.5 text-right font-medium">Runs &rarr; {nextLevel ?? 'next'}</th>
-            <th className="pb-1.5 text-right font-medium">Runs &rarr; {targetLevel}</th>
+            {columns.map((c) => {
+              const active = c.key === sortKey;
+              return (
+                <th
+                  key={c.key}
+                  scope="col"
+                  aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className={`pb-1.5 font-medium ${c.align === 'left' ? 'text-left' : 'text-right'}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onSort(c)}
+                    className={`group inline-flex cursor-pointer items-center gap-0.5 transition hover:text-slate-200 ${
+                      active ? 'text-amber-300' : ''
+                    }`}
+                  >
+                    {c.label}
+                    <span aria-hidden className={active ? '' : 'opacity-0 transition group-hover:opacity-60'}>
+                      {active ? (dir === 'asc' ? '▲' : '▼') : c.defaultDir === 'asc' ? '▲' : '▼'}
+                    </span>
+                  </button>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
-          {crops.map((c) => (
+          {sorted.map((c) => (
             <tr key={c.label} className="border-t border-white/5 text-slate-300">
-              <td className="py-1.5 pr-2 text-left font-medium text-slate-200">{c.label}</td>
-              <td className={cell}>{c.patches}</td>
-              <td className={cell}>{c.runsPerDay < 1 ? c.runsPerDay.toFixed(2) : fmtNum(c.runsPerDay, 1)}</td>
-              <td className={cell}>{(c.survival * 100).toFixed(1)}%</td>
-              <td className={`${cell} text-amber-300`}>{fmtNum(c.xpPerRun)}</td>
-              <td className={cell}>{fmtNum(c.patches > 0 ? c.xpPerRun / c.patches : 0)}</td>
-              <td className={`${cell} text-amber-300`}>{fmtNum(c.xpPerDay)}</td>
-              <td className={`${cell} text-rose-400`}>{fmtGp(c.costPerRun)}</td>
-              <td className={`${cell} ${money(c.netPerRun)}`}>{fmtGp(c.netPerRun)}</td>
-              <td className={`${cell} ${money(c.netPerDay)}`}>{fmtGp(c.netPerDay)}</td>
-              <td className={cell}>{runsFor(xpToNextLevel, c.xpPerRun)}</td>
-              <td className={cell}>{runsFor(xpToTarget, c.xpPerRun)}</td>
+              {columns.map((col) => (
+                <td
+                  key={col.key}
+                  className={
+                    col.align === 'left'
+                      ? 'py-1.5 pr-2 text-left font-medium text-slate-200'
+                      : `py-1.5 text-right ${col.cellClass?.(c) ?? ''}`
+                  }
+                >
+                  {col.render(c)}
+                </td>
+              ))}
             </tr>
           ))}
+          {/* Pinned below the sort so the totals never shuffle into the crops. */}
           <tr className="border-t-2 border-white/15 font-semibold text-slate-100">
-            <td className="py-1.5 pr-2 text-left">Overall</td>
-            <td className={cell}>{total.patches}</td>
-            <td className={cell}>—</td>
-            <td className={cell}>—</td>
-            <td className={cell}>—</td>
-            <td className={cell}>—</td>
-            <td className={`${cell} text-amber-300`}>{fmtNum(total.xpPerDay)}</td>
-            <td className={`${cell} text-rose-400`}>{fmtGp(total.costPerDay)}</td>
-            <td className={cell}>—</td>
-            <td className={`${cell} ${money(total.netPerDay)}`}>{fmtGp(total.netPerDay)}</td>
-            <td className={cell}>—</td>
-            <td className={cell}>—</td>
+            {columns.map((col) => (
+              <td
+                key={col.key}
+                className={
+                  col.align === 'left'
+                    ? 'py-1.5 pr-2 text-left'
+                    : `py-1.5 text-right ${
+                        col.key === 'xpPerDay'
+                          ? 'text-amber-300'
+                          : col.key === 'netPerDay'
+                            ? money(total.netPerDay)
+                            : ''
+                      }`
+                }
+              >
+                {col.total}
+              </td>
+            ))}
           </tr>
         </tbody>
       </table>
       <p className="mt-2 text-[10px] text-slate-600">
-        Run counts are for that crop on its own — how many runs it would take if nothing else were planted.
-        Running them together is what the days figures above describe, so the columns do not total.
+        Run counts are the trips you actually make over that stretch of the plan, at each crop&apos;s own
+        cadence — so the overall row is every farming trip, not every crop reaching the goal alone. Per-run
+        figures never total across crops, since each runs on a different cadence.
       </p>
     </div>
   );

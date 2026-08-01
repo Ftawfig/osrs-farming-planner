@@ -484,8 +484,8 @@ export default function Planner({ initial }: { initial: PricePayload }) {
                       </p>
                     )}
                     <p className="mt-1 text-[11px] text-slate-500">
-                      {(best.survival * 100).toFixed(1)}% survival &middot; {best.daysToTarget.toFixed(1)} days vs{' '}
-                      {current.daysToTarget.toFixed(1)} now
+                      {(best.survival * 100).toFixed(1)}% survival &middot; {fmtNum(best.daysToTarget, 1)} days vs{' '}
+                      {fmtNum(current.daysToTarget, 1)} now
                     </p>
                   </div>
                 );
@@ -741,7 +741,7 @@ function StrategyTable({ rows, current }: { rows: StrategyRow[]; current: Strate
               <td className="py-1">{r.label}</td>
               <td className="py-1 text-right">{(r.survival * 100).toFixed(1)}%</td>
               <td className="py-1 text-right">{fmtGp(r.runXp)}</td>
-              <td className="py-1 text-right">{r.daysToTarget.toFixed(1)}</td>
+              <td className="py-1 text-right">{fmtNum(r.daysToTarget, 1)}</td>
               <td className="py-1 text-right">{fmtGp(r.costToTarget)}</td>
             </tr>
           ))}

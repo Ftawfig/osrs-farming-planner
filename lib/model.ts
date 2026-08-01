@@ -340,60 +340,121 @@ export function computeRun(cfg: Config, prices: PriceMap): RunResult {
   };
 }
 
+/** One stretch of the grind spent at a single Farming level. */
+interface LevelSegment {
+  level: number;
+  startRun: number;
+  endRun: number;
+  startXp: number;
+  xpPerRun: number;
+  netPerRun: number;
+  /** Cumulative net GP at startRun. */
+  startNet: number;
+}
+
 export function project(cfg: Config, prices: PriceMap): Projection {
-  const run = computeRun(cfg, prices);
   const targetXp = cfg.targetLevel >= 99 ? MAX_XP : Math.min(MAX_XP, xpForLevel(cfg.targetLevel));
   const xpNeeded = Math.max(0, targetXp - cfg.currentXp);
-  const xpPerRun = run.xpPerRun;
-  const runsNeeded = xpPerRun > 0 ? xpNeeded / xpPerRun : Infinity;
   const runsPerDay = Math.max(0.0001, cfg.runsPerDay);
-  const days = runsNeeded / runsPerDay;
-  const hours = (runsNeeded * cfg.minutesPerRun) / 60;
-
   const startLevel = levelForXp(cfg.currentXp);
-  const nextLevelXp = startLevel < 99 ? xpForLevel(startLevel + 1) : MAX_XP;
-  const runsToNextLevel = xpPerRun > 0 ? Math.max(0, nextLevelXp - cfg.currentXp) / xpPerRun : Infinity;
 
-  // Level-up milestones between here and the target.
+  // Per-run figures depend on currentXp only through the level, so one
+  // computeRun per level is exact and keeps this cheap even for long grinds.
+  const cache = new Map<number, RunResult>();
+  const runAtLevel = (level: number): RunResult => {
+    const hit = cache.get(level);
+    if (hit) return hit;
+    const fresh = computeRun({ ...cfg, currentXp: xpForLevel(level) }, prices);
+    cache.set(level, fresh);
+    return fresh;
+  };
+
+  const run = runAtLevel(startLevel);
+
+  // Walk level by level, solving each stretch analytically.
+  const segments: LevelSegment[] = [];
   const levelUps: LevelUp[] = [];
-  if (xpPerRun > 0) {
-    let prevRun = 0;
-    for (let lvl = startLevel + 1; lvl <= cfg.targetLevel; lvl++) {
-      const need = xpForLevel(lvl) - cfg.currentXp;
-      if (need <= 0) continue;
-      const atRun = need / xpPerRun;
+  let xp = cfg.currentXp;
+  let runs = 0;
+  let cost = 0;
+  let revenue = 0;
+  let stalled = false;
+
+  while (xp < targetXp) {
+    const level = levelForXp(xp);
+    const r = runAtLevel(level);
+    if (r.xpPerRun <= 0) {
+      stalled = true;
+      break;
+    }
+    // This stretch ends at the next level-up, or at the target, whichever comes first.
+    const boundary = level < 99 ? Math.min(targetXp, xpForLevel(level + 1)) : targetXp;
+    const runsHere = (boundary - xp) / r.xpPerRun;
+
+    segments.push({
+      level,
+      startRun: runs,
+      endRun: runs + runsHere,
+      startXp: xp,
+      xpPerRun: r.xpPerRun,
+      netPerRun: r.netPerRun,
+      startNet: revenue - cost,
+    });
+
+    runs += runsHere;
+    cost += r.costPerRun * runsHere;
+    revenue += r.revenuePerRun * runsHere;
+    xp = boundary;
+
+    if (xp >= xpForLevel(level + 1) && level + 1 <= cfg.targetLevel) {
       levelUps.push({
-        level: lvl,
-        run: atRun,
-        day: atRun / runsPerDay,
-        xp: xpForLevel(lvl),
-        runsForLevel: atRun - prevRun,
+        level: level + 1,
+        run: runs,
+        day: runs / runsPerDay,
+        xp: xpForLevel(level + 1),
+        runsForLevel: runsHere,
       });
-      prevRun = atRun;
     }
   }
 
-  const totalCost = run.costPerRun * runsNeeded;
-  const totalRevenue = run.revenuePerRun * runsNeeded;
+  const runsNeeded = stalled ? Infinity : runs;
+  const days = runsNeeded / runsPerDay;
+  const hours = (runsNeeded * cfg.minutesPerRun) / 60;
+
+  // Measured against the next level specifically, not the first segment — the
+  // target can land before the level-up, which would cut the segment short.
+  const nextLevelXp = startLevel < 99 ? xpForLevel(startLevel + 1) : MAX_XP;
+  const runsToNextLevel =
+    run.xpPerRun > 0 ? Math.max(0, nextLevelXp - cfg.currentXp) / run.xpPerRun : Infinity;
+
+  // Nothing planted means nothing spent, rather than an infinite bill.
+  const totalCost = stalled ? 0 : cost;
+  const totalRevenue = stalled ? 0 : revenue;
   const totalNet = totalRevenue - totalCost;
 
-  // Timeline — one point per run, capped so charts stay readable.
-  const timeline: TimelinePoint[] = [];
-  const totalRuns = Number.isFinite(runsNeeded) ? Math.ceil(runsNeeded) : 0;
-  const step = Math.max(1, Math.ceil(totalRuns / 240));
+  // Timeline — XP and GP are piecewise linear across the segments.
   const pointAt = (r: number): TimelinePoint => {
-    const xp = Math.min(targetXp, cfg.currentXp + xpPerRun * r);
+    const seg =
+      segments.find((s) => r >= s.startRun && r <= s.endRun) ?? segments[segments.length - 1];
+    const atXp = seg ? Math.min(targetXp, seg.startXp + (r - seg.startRun) * seg.xpPerRun) : cfg.currentXp;
+    const atNet = seg ? seg.startNet + (r - seg.startRun) * seg.netPerRun : 0;
     return {
       run: r,
       day: r / runsPerDay,
-      xp,
-      level: levelForXp(xp),
-      preciseLevel: preciseLevel(xp),
-      netGp: run.netPerRun * r,
+      xp: atXp,
+      level: levelForXp(atXp),
+      preciseLevel: preciseLevel(atXp),
+      netGp: atNet,
     };
   };
-  for (let r = 0; r <= totalRuns; r += step) timeline.push(pointAt(r));
-  if (totalRuns > 0 && timeline[timeline.length - 1].run !== totalRuns) timeline.push(pointAt(runsNeeded));
+
+  const timeline: TimelinePoint[] = [];
+  if (Number.isFinite(runsNeeded) && runsNeeded > 0) {
+    const samples = 240;
+    for (let i = 0; i <= samples; i++) timeline.push(pointAt((runsNeeded * i) / samples));
+  } else {
+    timeline.push(pointAt(0));
+  }
 
   return {
     xpNeeded,
@@ -404,9 +465,9 @@ export function project(cfg: Config, prices: PriceMap): Projection {
     totalCost,
     totalRevenue,
     totalNet,
-    gpPerXp: xpNeeded > 0 ? -totalNet / xpNeeded : 0,
-    xpPerHour: cfg.minutesPerRun > 0 ? xpPerRun / (cfg.minutesPerRun / 60) : 0,
-    xpPerDay: xpPerRun * runsPerDay,
+    gpPerXp: xpNeeded > 0 && Number.isFinite(totalNet) ? -totalNet / xpNeeded : 0,
+    xpPerHour: cfg.minutesPerRun > 0 ? run.xpPerRun / (cfg.minutesPerRun / 60) : 0,
+    xpPerDay: run.xpPerRun * runsPerDay,
     gpPerDay: run.netPerRun * runsPerDay,
     run,
     timeline,
@@ -496,6 +557,7 @@ export const DEFAULT_CONFIG: Config = {
 };
 
 export const fmtGp = (n: number): string => {
+  if (!Number.isFinite(n)) return '—';
   const abs = Math.abs(n);
   const sign = n < 0 ? '-' : '';
   if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(2)}B`;

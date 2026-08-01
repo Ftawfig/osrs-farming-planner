@@ -64,6 +64,14 @@ Yields are derived rather than entered by hand:
 The sell toggles decide whether roots, logs, herbs and spare fruit count towards
 profit and loss; they never change XP.
 
+The projection is level-aware. Because per-run figures depend on your XP only
+through your level, `project()` solves each level as one analytic segment and
+recomputes yields at every level-up — so rising herb save chance, root
+thresholds and the Farming cape at 99 all land at the right point, at a cost of
+at most 98 `computeRun` calls rather than one per run. Your selected crops are
+held constant for the whole projection; it will not silently upgrade you from
+willows to magics on the way to 99.
+
 Two other values are worth knowing about:
 
 - The wiki publishes tree disease rates only for maple (13/128 over 7 cycles) and

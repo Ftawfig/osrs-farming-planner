@@ -798,6 +798,55 @@ export function compareCrops(
   });
 }
 
+/**
+ * Crop picks passed from the rates page to the planner as query params, e.g.
+ * `/?herb=ranarr&hardwood=camphor`.
+ */
+export const CROP_PARAM: Record<PatchKind, string> = {
+  tree: 'tree',
+  hardwood: 'hardwood',
+  fruitTree: 'fruit',
+  herb: 'herb',
+};
+
+export interface CropSelection {
+  treeType?: TreeKey;
+  hardwoodType?: HardwoodKey;
+  fruitType?: FruitTreeKey;
+  herbType?: HerbKey;
+}
+
+/** Read crop picks out of a query string, ignoring anything unrecognised. */
+export function parseCropSelection(params: { get(name: string): string | null }): CropSelection {
+  const pick = <T extends string>(name: string, valid: readonly string[]): T | undefined => {
+    const raw = params.get(name);
+    return raw && valid.includes(raw) ? (raw as T) : undefined;
+  };
+
+  return {
+    treeType: pick<TreeKey>(CROP_PARAM.tree, Object.keys(TREES)),
+    hardwoodType: pick<HardwoodKey>(CROP_PARAM.hardwood, Object.keys(HARDWOOD_TREES)),
+    fruitType: pick<FruitTreeKey>(CROP_PARAM.fruitTree, Object.keys(FRUIT_TREES)),
+    herbType: pick<HerbKey>(CROP_PARAM.herb, Object.keys(HERBS)),
+  };
+}
+
+/** Apply crop picks, re-deriving each swapped crop's cadence from its growth time. */
+export function applyCropSelection(cfg: Config, sel: CropSelection): Config {
+  const next = { ...cfg };
+  if (sel.treeType) {
+    next.treeType = sel.treeType;
+    next.treeRunsPerDay = defaultRunsPerDay('tree', TREES[sel.treeType].growthMinutes);
+  }
+  if (sel.hardwoodType) {
+    next.hardwoodType = sel.hardwoodType;
+    next.hardwoodRunsPerDay = defaultRunsPerDay('hardwood', HARDWOOD_TREES[sel.hardwoodType].growthMinutes);
+  }
+  if (sel.fruitType) next.fruitType = sel.fruitType;
+  if (sel.herbType) next.herbType = sel.herbType;
+  return next;
+}
+
 export const DEFAULT_CONFIG: Config = {
   currentXp: 7570122, // level 93, halfway to 94
   targetLevel: 99,

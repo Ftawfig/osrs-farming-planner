@@ -46,9 +46,11 @@ import {
 import {
   Config,
   CropResult,
+  CropSelection,
   DEFAULT_CONFIG,
   PriceMap,
   StrategyRow,
+  applyCropSelection,
   compareStrategies,
   fmtGp,
   fmtNum,
@@ -136,16 +138,21 @@ export default function Planner({
   initial,
   defaultRsn,
   initialPlayer,
+  initialCrops,
 }: {
   initial: PricePayload;
   defaultRsn: string;
   initialPlayer: Player | null;
+  initialCrops?: CropSelection;
 }) {
   // Seed straight from the server-loaded character so the first paint is already
-  // that account's numbers, with DEFAULT_CONFIG as the fallback if the lookup failed.
-  const [cfg, setCfg] = useState<Config>(() =>
-    initialPlayer ? applyLevelGating({ ...DEFAULT_CONFIG, currentXp: initialPlayer.xp }) : DEFAULT_CONFIG,
-  );
+  // that account's numbers, with DEFAULT_CONFIG as the fallback if the lookup
+  // failed. Crop picks arriving from the rates page layer on top, then get
+  // level-gated in case they name something this account cannot plant.
+  const [cfg, setCfg] = useState<Config>(() => {
+    const base = initialPlayer ? { ...DEFAULT_CONFIG, currentXp: initialPlayer.xp } : DEFAULT_CONFIG;
+    return applyLevelGating(applyCropSelection(base, initialCrops ?? {}));
+  });
   const [live, setLive] = useState<PriceMap>(initial.prices);
   const [overrides, setOverrides] = useState<Partial<Record<ItemKey, number>>>({});
   const [meta, setMeta] = useState({

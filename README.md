@@ -23,7 +23,12 @@ settled against home-grown produce **per day** rather than per run.
   type can be switched out of the model entirely without losing its settings.
 - **Crop rates** (`/compare`) — every farmable crop rated against the others,
   one patch at a time, at the cadence its growth time allows. Per-patch figures,
-  so they don't depend on how many patches you run.
+  so they don't depend on how many patches you run. Sort by clicking a column
+  heading; click a row to load that crop into the planner.
+
+Crop picks travel between the two pages as query params — `/?herb=ranarr&hardwood=camphor`
+— so a planner setup is a shareable link. Swapped crops have their cadence
+re-derived from growth time, and are level-gated against the loaded account.
 
 ## Clearing a patch
 

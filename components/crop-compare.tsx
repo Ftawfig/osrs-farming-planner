@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, Field, Select } from '@/components/ui';
 import { PatchKind, Strategy, levelForXp } from '@/lib/gameData';
-import { CropOption, DEFAULT_CONFIG, PriceMap, compareCrops, fmtGp, fmtNum } from '@/lib/model';
+import { CROP_PARAM, CropOption, DEFAULT_CONFIG, PriceMap, compareCrops, fmtGp, fmtNum } from '@/lib/model';
 import type { Player } from '@/lib/hiscores';
 import type { PricePayload } from '@/lib/prices';
 
@@ -15,13 +16,82 @@ const STRATEGY_OPTIONS: { value: Strategy; label: string }[] = [
   { value: 'none', label: 'No protection' },
 ];
 
-type SortKey = 'level' | 'xpPerDay' | 'netPerDay' | 'gpPerXp';
-
 const SECTIONS: { kind: PatchKind; title: string; note: string }[] = [
   { kind: 'tree', title: 'Trees', note: 'One tree patch, replanted every run' },
   { kind: 'hardwood', title: 'Hardwood trees', note: 'One hardwood patch — logs only, no roots' },
   { kind: 'fruitTree', title: 'Fruit trees', note: 'One fruit tree patch, 6 fruit a cycle' },
   { kind: 'herb', title: 'Herbs', note: 'One herb patch — compost only, never paid for' },
+];
+
+type SortDir = 'asc' | 'desc';
+
+interface Column {
+  key: string;
+  label: string;
+  align: 'left' | 'right';
+  /** Which way to sort when this column is first clicked. */
+  defaultDir: SortDir;
+  sortValue: (r: CropOption) => number | string;
+  render: (r: CropOption) => string;
+}
+
+const COLUMNS: Column[] = [
+  {
+    key: 'name',
+    label: 'Crop',
+    align: 'left',
+    defaultDir: 'asc',
+    sortValue: (r) => r.name,
+    render: (r) => r.name,
+  },
+  {
+    key: 'level',
+    label: 'Lvl',
+    align: 'right',
+    defaultDir: 'asc',
+    sortValue: (r) => r.level,
+    render: (r) => String(r.level),
+  },
+  {
+    key: 'runsPerDay',
+    label: 'Runs / day',
+    align: 'right',
+    defaultDir: 'desc',
+    sortValue: (r) => r.runsPerDay,
+    render: (r) => (r.runsPerDay < 1 ? r.runsPerDay.toFixed(2) : fmtNum(r.runsPerDay, 1)),
+  },
+  {
+    key: 'xpPerRun',
+    label: 'XP / run',
+    align: 'right',
+    defaultDir: 'desc',
+    sortValue: (r) => r.xpPerRun,
+    render: (r) => fmtNum(r.xpPerRun),
+  },
+  {
+    key: 'xpPerDay',
+    label: 'XP / day',
+    align: 'right',
+    defaultDir: 'desc',
+    sortValue: (r) => r.xpPerDay,
+    render: (r) => fmtNum(r.xpPerDay),
+  },
+  {
+    key: 'netPerDay',
+    label: 'Net / day',
+    align: 'right',
+    defaultDir: 'desc',
+    sortValue: (r) => r.netPerDay,
+    render: (r) => fmtGp(r.netPerDay),
+  },
+  {
+    key: 'gpPerXp',
+    label: 'GP / XP',
+    align: 'right',
+    defaultDir: 'asc',
+    sortValue: (r) => r.gpPerXp,
+    render: (r) => (r.xpPerDay > 0 ? r.gpPerXp.toFixed(2) : '—'),
+  },
 ];
 
 export default function CropCompare({
@@ -31,8 +101,29 @@ export default function CropCompare({
   initial: PricePayload;
   initialPlayer: Player | null;
 }) {
+  const router = useRouter();
   const [strategy, setStrategy] = useState<Strategy>('pay');
-  const [sort, setSort] = useState<SortKey>('gpPerXp');
+
+  // Picks accumulate here so you can choose a crop in several tables before
+  // opening the planner, and they ride along in the URL when you do.
+  const [picks, setPicks] = useState<Record<PatchKind, string>>({
+    tree: DEFAULT_CONFIG.treeType,
+    hardwood: DEFAULT_CONFIG.hardwoodType,
+    fruitTree: DEFAULT_CONFIG.fruitType,
+    herb: DEFAULT_CONFIG.herbType,
+  });
+
+  const plannerHref = (next: Record<PatchKind, string>) => {
+    const q = new URLSearchParams();
+    for (const kind of Object.keys(next) as PatchKind[]) q.set(CROP_PARAM[kind], next[kind]);
+    return `/?${q}`;
+  };
+
+  const choose = (kind: PatchKind, key: string) => {
+    const next = { ...picks, [kind]: key };
+    setPicks(next);
+    router.push(plannerHref(next));
+  };
 
   const cfg = useMemo(
     () => ({ ...DEFAULT_CONFIG, currentXp: initialPlayer?.xp ?? DEFAULT_CONFIG.currentXp }),
@@ -56,26 +147,10 @@ export default function CropCompare({
             are per patch, so they compare cleanly regardless of how many you actually farm.
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="w-44">
-            <Field label="Protection" hint="herbs use compost">
-              <Select value={strategy} onChange={setStrategy} options={STRATEGY_OPTIONS} />
-            </Field>
-          </div>
-          <div className="w-40">
-            <Field label="Sort by">
-              <Select
-                value={sort}
-                onChange={setSort}
-                options={[
-                  { value: 'gpPerXp' as SortKey, label: 'GP per XP' },
-                  { value: 'xpPerDay' as SortKey, label: 'XP per day' },
-                  { value: 'netPerDay' as SortKey, label: 'Profit per day' },
-                  { value: 'level' as SortKey, label: 'Level' },
-                ]}
-              />
-            </Field>
-          </div>
+        <div className="w-44">
+          <Field label="Protection" hint="herbs use compost">
+            <Select value={strategy} onChange={setStrategy} options={STRATEGY_OPTIONS} />
+          </Field>
         </div>
       </header>
 
@@ -84,13 +159,14 @@ export default function CropCompare({
         {initialPlayer && ` (${initialPlayer.name})`}. Crops above your level are greyed out — they still show
         their rates so you can see what is worth training towards.{' '}
         <span className="text-slate-300">GP per XP</span> is the headline number: lower is cheaper, and
-        negative means the crop pays for itself.
+        negative means the crop pays for itself. Click a column heading to sort, or a row to load that crop
+        into the planner.
       </p>
 
       <div className="grid gap-4 xl:grid-cols-2">
         {tables.map((t) => (
           <Card key={t.kind} title={t.title} subtitle={t.note}>
-            <CropTable rows={t.rows} sort={sort} />
+            <CropTable rows={t.rows} selected={picks[t.kind]} onChoose={(key) => choose(t.kind, key)} />
           </Card>
         ))}
       </div>
@@ -98,33 +174,78 @@ export default function CropCompare({
   );
 }
 
-function CropTable({ rows, sort }: { rows: CropOption[]; sort: SortKey }) {
-  const sorted = [...rows].sort((a, b) => {
-    if (sort === 'level') return a.level - b.level;
-    if (sort === 'xpPerDay') return b.xpPerDay - a.xpPerDay;
-    if (sort === 'netPerDay') return b.netPerDay - a.netPerDay;
-    return a.gpPerXp - b.gpPerXp;
-  });
+function CropTable({
+  rows,
+  selected,
+  onChoose,
+}: {
+  rows: CropOption[];
+  selected: string;
+  onChoose: (key: string) => void;
+}) {
+  const [sortKey, setSortKey] = useState('gpPerXp');
+  const [dir, setDir] = useState<SortDir>('asc');
+
+  const column = COLUMNS.find((c) => c.key === sortKey) ?? COLUMNS[COLUMNS.length - 1];
+
+  const sorted = useMemo(() => {
+    const factor = dir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const av = column.sortValue(a);
+      const bv = column.sortValue(b);
+      if (typeof av === 'string' || typeof bv === 'string') {
+        return String(av).localeCompare(String(bv)) * factor;
+      }
+      return (av - bv) * factor;
+    });
+  }, [rows, column, dir]);
+
+  // Clicking the active column flips it; a new column starts in its own
+  // natural direction, so cheapest-first and most-XP-first both come for free.
+  const onSort = (c: Column) => {
+    if (c.key === sortKey) setDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortKey(c.key);
+      setDir(c.defaultDir);
+    }
+  };
 
   // Rank only what the account can actually plant.
-  const unlocked = sorted.filter((r) => r.unlocked);
+  const unlocked = rows.filter((r) => r.unlocked);
   const bestGpPerXp = unlocked.length ? Math.min(...unlocked.map((r) => r.gpPerXp)) : null;
   const bestXpPerDay = unlocked.length ? Math.max(...unlocked.map((r) => r.xpPerDay)) : null;
-
-  const cell = 'py-1.5 text-right';
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] text-[11px] tabular-nums">
         <thead>
           <tr className="text-slate-500">
-            <th className="pb-1.5 text-left font-medium">Crop</th>
-            <th className="pb-1.5 text-right font-medium">Lvl</th>
-            <th className="pb-1.5 text-right font-medium">Runs / day</th>
-            <th className="pb-1.5 text-right font-medium">XP / run</th>
-            <th className="pb-1.5 text-right font-medium">XP / day</th>
-            <th className="pb-1.5 text-right font-medium">Net / day</th>
-            <th className="pb-1.5 text-right font-medium">GP / XP</th>
+            {COLUMNS.map((c) => {
+              const active = c.key === sortKey;
+              return (
+                <th
+                  key={c.key}
+                  scope="col"
+                  aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className={`pb-1.5 font-medium ${c.align === 'left' ? 'text-left' : 'text-right'}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onSort(c)}
+                    className={`group inline-flex cursor-pointer items-center gap-0.5 transition hover:text-slate-200 ${
+                      active ? 'text-amber-300' : ''
+                    }`}
+                  >
+                    {c.label}
+                    {/* Inactive arrows stay reserved but invisible, so the
+                        heading doesn't shift when the sort column changes. */}
+                    <span aria-hidden className={active ? '' : 'opacity-0 transition group-hover:opacity-60'}>
+                      {active ? (dir === 'asc' ? '▲' : '▼') : c.defaultDir === 'asc' ? '▲' : '▼'}
+                    </span>
+                  </button>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -134,26 +255,44 @@ function CropTable({ rows, sort }: { rows: CropOption[]; sort: SortKey }) {
             return (
               <tr
                 key={r.key}
-                className={`border-t border-white/5 ${r.unlocked ? 'text-slate-300' : 'text-slate-600'}`}
+                onClick={() => onChoose(r.key)}
+                tabIndex={0}
+                role="button"
+                aria-label={`Use ${r.name} in the planner`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onChoose(r.key);
+                  }
+                }}
+                className={`cursor-pointer border-t border-white/5 transition hover:bg-white/5 ${
+                  r.unlocked ? 'text-slate-300' : 'text-slate-600'
+                } ${r.key === selected ? 'bg-amber-400/10' : ''}`}
               >
-                <td className="py-1.5 pr-2 text-left font-medium">
-                  <span className={r.unlocked ? 'text-slate-200' : ''}>{r.name}</span>
-                  {!r.unlocked && <span className="ml-1 text-[10px] text-slate-600">locked</span>}
-                </td>
-                <td className={cell}>{r.level}</td>
-                <td className={cell}>
-                  {r.runsPerDay < 1 ? r.runsPerDay.toFixed(2) : fmtNum(r.runsPerDay, 1)}
-                </td>
-                <td className={cell}>{fmtNum(r.xpPerRun)}</td>
-                <td className={`${cell} ${topXp ? 'font-semibold text-amber-300' : ''}`}>
-                  {fmtNum(r.xpPerDay)}
-                </td>
-                <td className={`${cell} ${r.netPerDay >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {fmtGp(r.netPerDay)}
-                </td>
-                <td className={`${cell} ${topValue ? 'font-semibold text-emerald-400' : ''}`}>
-                  {r.xpPerDay > 0 ? r.gpPerXp.toFixed(2) : '—'}
-                </td>
+                {COLUMNS.map((c) => {
+                  const highlight =
+                    (c.key === 'xpPerDay' && topXp) || (c.key === 'gpPerXp' && topValue)
+                      ? c.key === 'xpPerDay'
+                        ? 'font-semibold text-amber-300'
+                        : 'font-semibold text-emerald-400'
+                      : '';
+                  const money =
+                    c.key === 'netPerDay' ? (r.netPerDay >= 0 ? 'text-emerald-400' : 'text-rose-400') : '';
+
+                  if (c.key === 'name') {
+                    return (
+                      <td key={c.key} className="py-1.5 pr-2 text-left font-medium">
+                        <span className={r.unlocked ? 'text-slate-200' : ''}>{r.name}</span>
+                        {!r.unlocked && <span className="ml-1 text-[10px] text-slate-600">locked</span>}
+                      </td>
+                    );
+                  }
+                  return (
+                    <td key={c.key} className={`py-1.5 text-right ${highlight} ${money}`}>
+                      {c.render(r)}
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}

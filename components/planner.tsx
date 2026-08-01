@@ -11,6 +11,7 @@ import {
 } from '@/components/charts';
 import { Card, Field, NumberField, Select, Slider, Stat, Toggle } from '@/components/ui';
 import {
+  CLEAR_PATCH_FEE,
   COMPOST,
   CompostTier,
   FARMING_CAPE_YIELD_BONUS_PCT,
@@ -25,6 +26,7 @@ import {
   ITEM_NAMES,
   ItemKey,
   MAX_PATCHES,
+  MINUTES_TO_FELL_TREE,
   OUTFIT_ALL_WORN,
   OUTFIT_FULL_BONUS_PCT,
   OUTFIT_NONE_WORN,
@@ -75,6 +77,29 @@ const SECATEURS_OPTIONS = (Object.keys(SECATEURS) as SecateursKey[]).map((k) => 
 
 const OUTFIT_KEYS = Object.keys(OUTFIT_PIECES) as OutfitPiece[];
 
+/** Header control that drops a patch type from the model, or brings it back. */
+function CropSwitch({ enabled, onToggle, name }: { enabled: boolean; onToggle: () => void; name: string }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={enabled ? `Remove ${name} from the model` : `Add ${name} to the model`}
+      title={enabled ? 'Remove from the model' : 'Add to the model'}
+      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-sm leading-none transition ${
+        enabled
+          ? 'border-white/15 text-slate-400 hover:border-rose-400/60 hover:text-rose-400'
+          : 'border-emerald-400/50 bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20'
+      }`}
+    >
+      {enabled ? '×' : '+'}
+    </button>
+  );
+}
+
+/** Shown in place of a patch type's controls once it is switched off. */
+function CropDisabled({ name }: { name: string }) {
+  return <p className="text-[11px] text-slate-500">{name} excluded from the model.</p>;
+}
+
 /** Seeds, produce and compost worth showing in the editable price list. */
 const priceKeysFor = (cfg: Config): ItemKey[] => {
   const t = TREES[cfg.treeType];
@@ -83,11 +108,21 @@ const priceKeysFor = (cfg: Config): ItemKey[] => {
   const h = HERBS[cfg.herbType];
   return [
     ...new Set<ItemKey>([
-      t.seedItem, t.rootsItem, t.logsItem, t.payItem,
-      w.seedItem, w.logsItem, w.payItem,
-      f.seedItem, f.fruitItem, f.payItem,
-      h.seedItem, h.productItem,
-      'compost', 'supercompost', 'ultracompost',
+      t.seedItem,
+      t.rootsItem,
+      t.logsItem,
+      t.payItem,
+      w.seedItem,
+      w.logsItem,
+      w.payItem,
+      f.seedItem,
+      f.fruitItem,
+      f.payItem,
+      h.seedItem,
+      h.productItem,
+      'compost',
+      'supercompost',
+      'ultracompost',
     ]),
   ];
 };
@@ -113,14 +148,18 @@ export default function Planner({
   );
   const [live, setLive] = useState<PriceMap>(initial.prices);
   const [overrides, setOverrides] = useState<Partial<Record<ItemKey, number>>>({});
-  const [meta, setMeta] = useState({ source: initial.source, fetchedAt: initial.fetchedAt });
+  const [meta, setMeta] = useState({
+    source: initial.source,
+    fetchedAt: initial.fetchedAt,
+  });
   const [loading, setLoading] = useState(false);
   const [showPrices, setShowPrices] = useState(false);
 
   const [rsn, setRsn] = useState(defaultRsn);
-  const [rsnStatus, setRsnStatus] = useState<{ kind: 'idle' | 'loading' | 'ok' | 'error'; msg?: string }>(
-    initialPlayer ? { kind: 'ok', msg: playerSummary(initialPlayer) } : { kind: 'idle' },
-  );
+  const [rsnStatus, setRsnStatus] = useState<{
+    kind: 'idle' | 'loading' | 'ok' | 'error';
+    msg?: string;
+  }>(initialPlayer ? { kind: 'ok', msg: playerSummary(initialPlayer) } : { kind: 'idle' });
 
   const set = <K extends keyof Config>(key: K, value: Config[K]) => setCfg((c) => ({ ...c, [key]: value }));
 
@@ -172,13 +211,22 @@ export default function Planner({
   const setLevel = (n: number) => {
     const base = xpForLevel(n);
     const span = n < 99 ? xpForLevel(n + 1) - base : 0;
-    setCfg((c) => applyLevelGating({ ...c, currentXp: Math.round(base + (pctToNext / 100) * span) }));
+    setCfg((c) =>
+      applyLevelGating({
+        ...c,
+        currentXp: Math.round(base + (pctToNext / 100) * span),
+      }),
+    );
   };
   const setPct = (p: number) => set('currentXp', Math.round(lvlBase + (p / 100) * lvlSpan));
 
   // Switching crop type re-derives that patch type's cadence from its growth time.
   const setTreeType = (v: TreeKey) =>
-    setCfg((c) => ({ ...c, treeType: v, treeRunsPerDay: defaultRunsPerDay('tree', TREES[v].growthMinutes) }));
+    setCfg((c) => ({
+      ...c,
+      treeType: v,
+      treeRunsPerDay: defaultRunsPerDay('tree', TREES[v].growthMinutes),
+    }));
   const setHardwoodType = (v: HardwoodKey) =>
     setCfg((c) => ({
       ...c,
@@ -189,7 +237,11 @@ export default function Planner({
   const gated = <K extends string>(all: K[], levelOf: (k: K) => number, name: (k: K) => string) =>
     all.filter((k) => levelOf(k) <= level).map((k) => ({ value: k, label: `${name(k)} (${levelOf(k)})` }));
 
-  const treeOptions = gated(Object.keys(TREES) as TreeKey[], (k) => TREES[k].level, (k) => TREES[k].name);
+  const treeOptions = gated(
+    Object.keys(TREES) as TreeKey[],
+    (k) => TREES[k].level,
+    (k) => TREES[k].name,
+  );
   const hardwoodOptions = gated(
     Object.keys(HARDWOOD_TREES) as HardwoodKey[],
     (k) => HARDWOOD_TREES[k].level,
@@ -200,36 +252,87 @@ export default function Planner({
     (k) => FRUIT_TREES[k].level,
     (k) => FRUIT_TREES[k].name,
   );
-  const herbOptions = gated(Object.keys(HERBS) as HerbKey[], (k) => HERBS[k].level, (k) => HERBS[k].name);
+  const herbOptions = gated(
+    Object.keys(HERBS) as HerbKey[],
+    (k) => HERBS[k].level,
+    (k) => HERBS[k].name,
+  );
 
   const cheapest = (rows: StrategyRow[]) => rows.reduce((a, b) => (b.costToTarget < a.costToTarget ? b : a));
   const fastest = (rows: StrategyRow[]) => rows.reduce((a, b) => (b.daysToTarget < a.daysToTarget ? b : a));
   const cur = (rows: StrategyRow[], s: Strategy) => rows.find((r) => r.strategy === s) ?? rows[0];
 
   const advice = [
-    { name: `${TREES[cfg.treeType].name} trees`, rows: treeRows, current: cfg.treeStrategy },
-    { name: `${HARDWOOD_TREES[cfg.hardwoodType].name} hardwood`, rows: hardwoodRows, current: cfg.hardwoodStrategy },
-    { name: FRUIT_TREES[cfg.fruitType].name, rows: fruitRows, current: cfg.fruitStrategy },
-    { name: `${HERBS[cfg.herbType].name} herbs`, rows: herbRows, current: cfg.herbCompost },
-  ].map((a) => ({ ...a, cheapest: cheapest(a.rows), fastest: fastest(a.rows), now: cur(a.rows, a.current) }));
+    {
+      name: `${TREES[cfg.treeType].name} trees`,
+      rows: treeRows,
+      current: cfg.treeStrategy,
+    },
+    {
+      name: `${HARDWOOD_TREES[cfg.hardwoodType].name} hardwood`,
+      rows: hardwoodRows,
+      current: cfg.hardwoodStrategy,
+    },
+    {
+      name: FRUIT_TREES[cfg.fruitType].name,
+      rows: fruitRows,
+      current: cfg.fruitStrategy,
+    },
+    {
+      name: `${HERBS[cfg.herbType].name} herbs`,
+      rows: herbRows,
+      current: cfg.herbCompost,
+    },
+  ].map((a) => ({
+    ...a,
+    cheapest: cheapest(a.rows),
+    fastest: fastest(a.rows),
+    now: cur(a.rows, a.current),
+  }));
 
-  const applyPlan = (pick: (rows: StrategyRow[]) => StrategyRow) =>
+  /**
+   * Cheapest fells the trees and sells what that yields; fastest pays a gardener
+   * to clear, which forfeits the logs and roots but saves the chopping.
+   */
+  const planClearing = (goal: 'cheapest' | 'fastest'): Partial<Config> =>
+    goal === 'cheapest'
+      ? {
+          clearMethod: 'chop',
+          sellRoots: true,
+          sellLogs: true,
+          sellHardwoodLogs: true,
+        }
+      : { clearMethod: 'pay' };
+
+  const applyPlan = (goal: 'cheapest' | 'fastest') => {
+    const pick = goal === 'cheapest' ? cheapest : fastest;
     setCfg((c) => ({
       ...c,
+      ...planClearing(goal),
       treeStrategy: pick(treeRows).strategy,
       hardwoodStrategy: pick(hardwoodRows).strategy,
       fruitStrategy: pick(fruitRows).strategy,
       herbCompost: pick(herbRows).strategy as CompostTier,
     }));
+  };
 
-  const matchesPlan = (pick: (rows: StrategyRow[]) => StrategyRow) =>
-    pick(treeRows).strategy === cfg.treeStrategy &&
-    pick(hardwoodRows).strategy === cfg.hardwoodStrategy &&
-    pick(fruitRows).strategy === cfg.fruitStrategy &&
-    pick(herbRows).strategy === cfg.herbCompost;
+  const matchesPlan = (goal: 'cheapest' | 'fastest') => {
+    const pick = goal === 'cheapest' ? cheapest : fastest;
+    const clearing = planClearing(goal);
+    return (
+      pick(treeRows).strategy === cfg.treeStrategy &&
+      pick(hardwoodRows).strategy === cfg.hardwoodStrategy &&
+      pick(fruitRows).strategy === cfg.fruitStrategy &&
+      pick(herbRows).strategy === cfg.herbCompost &&
+      (Object.keys(clearing) as (keyof Config)[]).every((k) => cfg[k] === clearing[k])
+    );
+  };
 
   const days = Number.isFinite(proj.daysNeeded) ? proj.daysNeeded : 0;
   const fullOutfit = OUTFIT_KEYS.every((k) => cfg.outfit[k]);
+  // Paying a gardener to clear removes the tree whole, so there is nothing to
+  // chop and no stump to dig — logs and roots are off the table.
+  const paying = cfg.clearMethod === 'pay';
   const diseaseFreeNames = diseaseFreeHerbPatchNames(cfg.herbPatches);
   const tree = TREES[cfg.treeType];
   const hardwood = HARDWOOD_TREES[cfg.hardwoodType];
@@ -298,7 +401,9 @@ export default function Planner({
                 </div>
               </Field>
               {rsnStatus.msg && (
-                <p className={`mt-1 text-[11px] ${rsnStatus.kind === 'ok' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <p
+                  className={`mt-1 text-[11px] ${rsnStatus.kind === 'ok' ? 'text-emerald-400' : 'text-rose-400'}`}
+                >
                   {rsnStatus.msg}
                 </p>
               )}
@@ -309,10 +414,21 @@ export default function Planner({
                 <NumberField value={level} onChange={setLevel} min={1} max={99} />
               </Field>
               <Field label="% to next">
-                <NumberField value={Math.round(pctToNext * 10) / 10} onChange={setPct} min={0} max={99.9} step={0.1} />
+                <NumberField
+                  value={Math.round(pctToNext * 10) / 10}
+                  onChange={setPct}
+                  min={0}
+                  max={99.9}
+                  step={0.1}
+                />
               </Field>
               <Field label="Target">
-                <NumberField value={cfg.targetLevel} onChange={(v) => set('targetLevel', v)} min={2} max={99} />
+                <NumberField
+                  value={cfg.targetLevel}
+                  onChange={(v) => set('targetLevel', v)}
+                  min={2}
+                  max={99}
+                />
               </Field>
             </div>
             <p className="mt-2 text-[11px] tabular-nums text-slate-500">
@@ -320,144 +436,243 @@ export default function Planner({
             </p>
           </Card>
 
-          <Card title="Trees" subtitle={`${fmtNum(tree.checkXp, 1)} xp per check · ${growthLabel(tree.growthMinutes)}`}>
-            <div className="space-y-3">
-              <Field label="Tree type">
-                <Select value={cfg.treeType} onChange={setTreeType} options={treeOptions} />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Patches" hint={`0–${MAX_PATCHES.tree}`}>
-                  <Slider value={cfg.treePatches} onChange={(v) => set('treePatches', v)} min={0} max={MAX_PATCHES.tree} />
+          <Card
+            title="Trees"
+            subtitle={`${fmtNum(tree.checkXp, 1)} xp per check · ${growthLabel(tree.growthMinutes)}`}
+            className={cfg.treeEnabled ? '' : 'opacity-60'}
+            actions={
+              <CropSwitch
+                enabled={cfg.treeEnabled}
+                onToggle={() => set('treeEnabled', !cfg.treeEnabled)}
+                name="trees"
+              />
+            }
+          >
+            {!cfg.treeEnabled ? (
+              <CropDisabled name="Trees" />
+            ) : (
+              <div className="space-y-3">
+                <Field label="Tree type">
+                  <Select value={cfg.treeType} onChange={setTreeType} options={treeOptions} />
                 </Field>
-                <RunsPerDayField
-                  value={cfg.treeRunsPerDay}
-                  onChange={(v) => set('treeRunsPerDay', v)}
-                  growthMinutes={tree.growthMinutes}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Patches" hint={`0–${MAX_PATCHES.tree}`}>
+                    <Slider
+                      value={cfg.treePatches}
+                      onChange={(v) => set('treePatches', v)}
+                      min={0}
+                      max={MAX_PATCHES.tree}
+                    />
+                  </Field>
+                  <RunsPerDayField
+                    value={cfg.treeRunsPerDay}
+                    onChange={(v) => set('treeRunsPerDay', v)}
+                    growthMinutes={tree.growthMinutes}
+                  />
+                </div>
+                <Field label="Protection">
+                  <Select
+                    value={cfg.treeStrategy}
+                    onChange={(v) => set('treeStrategy', v)}
+                    options={STRATEGY_OPTIONS}
+                  />
+                </Field>
+                <Toggle
+                  checked={paying}
+                  onChange={(b) => set('clearMethod', b ? 'pay' : 'chop')}
+                  label={`Pay ${CLEAR_PATCH_FEE} gp to clear`}
+                  hint={
+                    paying
+                      ? 'Instant, but forfeits logs and roots'
+                      : `Chopping adds ~${MINUTES_TO_FELL_TREE} min a tree`
+                  }
+                />
+                <Toggle
+                  checked={cfg.sellRoots}
+                  onChange={(b) => set('sellRoots', b)}
+                  disabled={paying}
+                  label="Sell roots"
+                  hint={
+                    paying
+                      ? 'Needs the stump — chop instead'
+                      : `${proj.day.rootsPerTree} per tree at level ${level}`
+                  }
+                />
+                <Toggle
+                  checked={cfg.sellLogs}
+                  onChange={(b) => set('sellLogs', b)}
+                  disabled={paying}
+                  label="Sell logs"
+                  hint={
+                    paying ? 'Needs felling — chop instead' : `~${proj.day.logsPerTree} per tree when felled`
+                  }
                 />
               </div>
-              <Field label="Protection">
-                <Select value={cfg.treeStrategy} onChange={(v) => set('treeStrategy', v)} options={STRATEGY_OPTIONS} />
-              </Field>
-              <Toggle
-                checked={cfg.sellRoots}
-                onChange={(b) => set('sellRoots', b)}
-                label="Sell roots"
-                hint={`${proj.day.rootsPerTree} per tree at level ${level}`}
-              />
-              <Toggle
-                checked={cfg.sellLogs}
-                onChange={(b) => set('sellLogs', b)}
-                label="Sell logs"
-                hint={`~${proj.day.logsPerTree} per tree when felled`}
-              />
-            </div>
+            )}
           </Card>
 
           <Card
             title="Hardwood trees"
             subtitle={`${fmtNum(hardwood.checkXp, 1)} xp per check · ${growthLabel(hardwood.growthMinutes)}`}
+            className={cfg.hardwoodEnabled ? '' : 'opacity-60'}
+            actions={
+              <CropSwitch
+                enabled={cfg.hardwoodEnabled}
+                onToggle={() => set('hardwoodEnabled', !cfg.hardwoodEnabled)}
+                name="hardwood trees"
+              />
+            }
           >
-            <div className="space-y-3">
-              <Field label="Hardwood type">
-                <Select value={cfg.hardwoodType} onChange={setHardwoodType} options={hardwoodOptions} />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Patches" hint={`0–${MAX_PATCHES.hardwood}`}>
-                  <Slider
-                    value={cfg.hardwoodPatches}
-                    onChange={(v) => set('hardwoodPatches', v)}
-                    min={0}
-                    max={MAX_PATCHES.hardwood}
+            {!cfg.hardwoodEnabled ? (
+              <CropDisabled name="Hardwood trees" />
+            ) : (
+              <div className="space-y-3">
+                <Field label="Hardwood type">
+                  <Select value={cfg.hardwoodType} onChange={setHardwoodType} options={hardwoodOptions} />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Patches" hint={`0–${MAX_PATCHES.hardwood}`}>
+                    <Slider
+                      value={cfg.hardwoodPatches}
+                      onChange={(v) => set('hardwoodPatches', v)}
+                      min={0}
+                      max={MAX_PATCHES.hardwood}
+                    />
+                  </Field>
+                  <RunsPerDayField
+                    value={cfg.hardwoodRunsPerDay}
+                    onChange={(v) => set('hardwoodRunsPerDay', v)}
+                    growthMinutes={hardwood.growthMinutes}
+                  />
+                </div>
+                <Field label="Protection">
+                  <Select
+                    value={cfg.hardwoodStrategy}
+                    onChange={(v) => set('hardwoodStrategy', v)}
+                    options={STRATEGY_OPTIONS}
                   />
                 </Field>
-                <RunsPerDayField
-                  value={cfg.hardwoodRunsPerDay}
-                  onChange={(v) => set('hardwoodRunsPerDay', v)}
-                  growthMinutes={hardwood.growthMinutes}
+                <Toggle
+                  checked={cfg.sellHardwoodLogs}
+                  onChange={(b) => set('sellHardwoodLogs', b)}
+                  disabled={paying}
+                  label="Sell logs"
+                  hint={paying ? 'Needs felling — chop instead' : 'Hardwoods give no roots'}
                 />
               </div>
-              <Field label="Protection">
-                <Select
-                  value={cfg.hardwoodStrategy}
-                  onChange={(v) => set('hardwoodStrategy', v)}
-                  options={STRATEGY_OPTIONS}
-                />
-              </Field>
-              <Toggle
-                checked={cfg.sellHardwoodLogs}
-                onChange={(b) => set('sellHardwoodLogs', b)}
-                label="Sell logs"
-                hint="Hardwoods give no roots"
-              />
-            </div>
+            )}
           </Card>
 
           <Card
             title="Fruit trees"
             subtitle={`${fmtNum(fruit.checkXp, 1)} xp per check · ${growthLabel(FRUIT_TREE_GROWTH_MINUTES)}`}
+            className={cfg.fruitEnabled ? '' : 'opacity-60'}
+            actions={
+              <CropSwitch
+                enabled={cfg.fruitEnabled}
+                onToggle={() => set('fruitEnabled', !cfg.fruitEnabled)}
+                name="fruit trees"
+              />
+            }
           >
-            <div className="space-y-3">
-              <Field label="Fruit tree type">
-                <Select value={cfg.fruitType} onChange={(v) => set('fruitType', v)} options={fruitOptions} />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Patches" hint={`0–${MAX_PATCHES.fruitTree}`}>
-                  <Slider
-                    value={cfg.fruitPatches}
-                    onChange={(v) => set('fruitPatches', v)}
-                    min={0}
-                    max={MAX_PATCHES.fruitTree}
+            {!cfg.fruitEnabled ? (
+              <CropDisabled name="Fruit trees" />
+            ) : (
+              <div className="space-y-3">
+                <Field label="Fruit tree type">
+                  <Select
+                    value={cfg.fruitType}
+                    onChange={(v) => set('fruitType', v)}
+                    options={fruitOptions}
                   />
                 </Field>
-                <RunsPerDayField
-                  value={cfg.fruitRunsPerDay}
-                  onChange={(v) => set('fruitRunsPerDay', v)}
-                  growthMinutes={FRUIT_TREE_GROWTH_MINUTES}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Patches" hint={`0–${MAX_PATCHES.fruitTree}`}>
+                    <Slider
+                      value={cfg.fruitPatches}
+                      onChange={(v) => set('fruitPatches', v)}
+                      min={0}
+                      max={MAX_PATCHES.fruitTree}
+                    />
+                  </Field>
+                  <RunsPerDayField
+                    value={cfg.fruitRunsPerDay}
+                    onChange={(v) => set('fruitRunsPerDay', v)}
+                    growthMinutes={FRUIT_TREE_GROWTH_MINUTES}
+                  />
+                </div>
+                <Field label="Protection">
+                  <Select
+                    value={cfg.fruitStrategy}
+                    onChange={(v) => set('fruitStrategy', v)}
+                    options={STRATEGY_OPTIONS}
+                  />
+                </Field>
+                <Toggle
+                  checked={cfg.sellSpareFruit}
+                  onChange={(b) => set('sellSpareFruit', b)}
+                  label="Sell spare produce"
+                  hint="Fruit left after protection payments"
                 />
               </div>
-              <Field label="Protection">
-                <Select value={cfg.fruitStrategy} onChange={(v) => set('fruitStrategy', v)} options={STRATEGY_OPTIONS} />
-              </Field>
-              <Toggle
-                checked={cfg.sellSpareFruit}
-                onChange={(b) => set('sellSpareFruit', b)}
-                label="Sell spare produce"
-                hint="Fruit left after protection payments"
-              />
-            </div>
+            )}
           </Card>
 
-          <Card title="Herbs" subtitle={`Herb patches cannot be paid for · ${growthLabel(HERB_GROWTH_MINUTES)}`}>
-            <div className="space-y-3">
-              <Field label="Herb">
-                <Select value={cfg.herbType} onChange={(v) => set('herbType', v)} options={herbOptions} />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Patches" hint={`0–${MAX_PATCHES.herb}`}>
-                  <Slider value={cfg.herbPatches} onChange={(v) => set('herbPatches', v)} min={0} max={MAX_PATCHES.herb} />
-                </Field>
-                <RunsPerDayField
-                  value={cfg.herbRunsPerDay}
-                  onChange={(v) => set('herbRunsPerDay', v)}
-                  growthMinutes={HERB_GROWTH_MINUTES}
-                />
-              </div>
-              <Field label="Compost">
-                <Select value={cfg.herbCompost} onChange={(v) => set('herbCompost', v)} options={COMPOST_OPTIONS} />
-              </Field>
-              <Toggle
-                checked={cfg.sellHerbs}
-                onChange={(b) => set('sellHerbs', b)}
-                label="Sell herbs"
-                hint="Off if you keep them for Herblore"
+          <Card
+            title="Herbs"
+            subtitle={`Herb patches cannot be paid for · ${growthLabel(HERB_GROWTH_MINUTES)}`}
+            className={cfg.herbEnabled ? '' : 'opacity-60'}
+            actions={
+              <CropSwitch
+                enabled={cfg.herbEnabled}
+                onToggle={() => set('herbEnabled', !cfg.herbEnabled)}
+                name="herbs"
               />
-              <p className="text-[11px] text-slate-500">
-                <span className="tabular-nums">≈ {proj.day.herbYieldPerPatch.toFixed(2)}</span>{' '}
-                {herb.name.toLowerCase()} per surviving patch ·{' '}
-                <span className="tabular-nums">{proj.day.diseaseFreeHerbPatches}</span> disease-free
-                {diseaseFreeNames.length > 0 && ` (${diseaseFreeNames.join(', ')})`}
-              </p>
-            </div>
+            }
+          >
+            {!cfg.herbEnabled ? (
+              <CropDisabled name="Herbs" />
+            ) : (
+              <div className="space-y-3">
+                <Field label="Herb">
+                  <Select value={cfg.herbType} onChange={(v) => set('herbType', v)} options={herbOptions} />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Patches" hint={`0–${MAX_PATCHES.herb}`}>
+                    <Slider
+                      value={cfg.herbPatches}
+                      onChange={(v) => set('herbPatches', v)}
+                      min={0}
+                      max={MAX_PATCHES.herb}
+                    />
+                  </Field>
+                  <RunsPerDayField
+                    value={cfg.herbRunsPerDay}
+                    onChange={(v) => set('herbRunsPerDay', v)}
+                    growthMinutes={HERB_GROWTH_MINUTES}
+                  />
+                </div>
+                <Field label="Compost">
+                  <Select
+                    value={cfg.herbCompost}
+                    onChange={(v) => set('herbCompost', v)}
+                    options={COMPOST_OPTIONS}
+                  />
+                </Field>
+                <Toggle
+                  checked={cfg.sellHerbs}
+                  onChange={(b) => set('sellHerbs', b)}
+                  label="Sell herbs"
+                  hint="Off if you keep them for Herblore"
+                />
+                <p className="text-[11px] text-slate-500">
+                  <span className="tabular-nums">≈ {proj.day.herbYieldPerPatch.toFixed(2)}</span>{' '}
+                  {herb.name.toLowerCase()} per surviving patch ·{' '}
+                  <span className="tabular-nums">{proj.day.diseaseFreeHerbPatches}</span> disease-free
+                  {diseaseFreeNames.length > 0 && ` (${diseaseFreeNames.join(', ')})`}
+                </p>
+              </div>
+            )}
           </Card>
 
           <Card title="Gear" subtitle={`+${proj.day.outfitBonusPct.toFixed(1)}% farming XP`}>
@@ -482,7 +697,11 @@ export default function Planner({
               <p className="px-0.5 text-[10px] text-slate-500">Wearing all four adds a further +0.5%.</p>
               <div className="pt-1">
                 <Field label="Secateurs">
-                  <Select value={cfg.secateurs} onChange={(v) => set('secateurs', v)} options={SECATEURS_OPTIONS} />
+                  <Select
+                    value={cfg.secateurs}
+                    onChange={(v) => set('secateurs', v)}
+                    options={SECATEURS_OPTIONS}
+                  />
                 </Field>
               </div>
               <p className="px-0.5 text-[10px] text-slate-500">
@@ -506,10 +725,11 @@ export default function Planner({
             {!showPrices ? (
               <p className="text-xs leading-relaxed text-slate-400">
                 {ITEM_NAMES[tree.seedItem]}{' '}
-                <span className="tabular-nums text-slate-200">{fmtNum(prices[tree.seedItem] ?? 0)}</span> &middot;{' '}
-                {ITEM_NAMES[hardwood.seedItem]}{' '}
-                <span className="tabular-nums text-slate-200">{fmtNum(prices[hardwood.seedItem] ?? 0)}</span> &middot;
-                Ultracompost <span className="tabular-nums text-slate-200">{fmtNum(prices.ultracompost ?? 0)}</span>
+                <span className="tabular-nums text-slate-200">{fmtNum(prices[tree.seedItem] ?? 0)}</span>{' '}
+                &middot; {ITEM_NAMES[hardwood.seedItem]}{' '}
+                <span className="tabular-nums text-slate-200">{fmtNum(prices[hardwood.seedItem] ?? 0)}</span>{' '}
+                &middot; Ultracompost{' '}
+                <span className="tabular-nums text-slate-200">{fmtNum(prices.ultracompost ?? 0)}</span>
               </p>
             ) : (
               <div className="space-y-2">
@@ -595,23 +815,30 @@ export default function Planner({
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <button
-                onClick={() => applyPlan(cheapest)}
-                disabled={matchesPlan(cheapest)}
+                onClick={() => applyPlan('cheapest')}
+                disabled={matchesPlan('cheapest')}
                 className="rounded-md bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-default disabled:opacity-40"
               >
                 Apply cheapest strategies
               </button>
               <button
-                onClick={() => applyPlan(fastest)}
-                disabled={matchesPlan(fastest)}
+                onClick={() => applyPlan('fastest')}
+                disabled={matchesPlan('fastest')}
                 className="rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-default disabled:opacity-40"
               >
                 Apply fastest strategies
               </button>
+              <p className="w-full text-[11px] text-slate-500">
+                Cheapest also fells your own trees and sells the logs and roots; fastest pays{' '}
+                {CLEAR_PATCH_FEE} gp a patch to clear, forfeiting both.
+              </p>
             </div>
           </Card>
 
-          <Card title="Per-crop metrics" subtitle="Each patch type on its own cadence, after disease and the outfit bonus">
+          <Card
+            title="Per-crop metrics"
+            subtitle="Each patch type on its own cadence, after disease and the outfit bonus"
+          >
             <CropTable crops={proj.day.crops} />
           </Card>
 
@@ -625,12 +852,19 @@ export default function Planner({
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
-            <Card title="Days per level" subtitle={`${fmtNum(proj.daysNeeded, 1)} days to ${cfg.targetLevel}`}>
+            <Card
+              title="Days per level"
+              subtitle={`${fmtNum(proj.daysNeeded, 1)} days to ${cfg.targetLevel}`}
+            >
               <DaysPerLevelChart levelUps={proj.levelUps} />
             </Card>
             <Card title="XP per day by source">
               <XpBreakdownChart
-                data={proj.day.crops.map((c) => ({ label: c.label, kind: c.kind, xp: c.xpPerDay }))}
+                data={proj.day.crops.map((c) => ({
+                  label: c.label,
+                  kind: c.kind,
+                  xp: c.xpPerDay,
+                }))}
               />
             </Card>
           </div>
@@ -657,11 +891,17 @@ export default function Planner({
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
-            <Card title={`${tree.name} tree strategies`} subtitle="Whole-day totals, everything else held equal">
+            <Card
+              title={`${tree.name} tree strategies`}
+              subtitle="Whole-day totals, everything else held equal"
+            >
               <StrategyChart rows={treeRows} highlight={cfg.treeStrategy} />
               <StrategyTable rows={treeRows} current={cfg.treeStrategy} />
             </Card>
-            <Card title={`${hardwood.name} strategies`} subtitle="Whole-day totals, everything else held equal">
+            <Card
+              title={`${hardwood.name} strategies`}
+              subtitle="Whole-day totals, everything else held equal"
+            >
               <StrategyChart rows={hardwoodRows} highlight={cfg.hardwoodStrategy} />
               <StrategyTable rows={hardwoodRows} current={cfg.hardwoodStrategy} />
             </Card>
@@ -669,7 +909,10 @@ export default function Planner({
               <StrategyChart rows={fruitRows} highlight={cfg.fruitStrategy} />
               <StrategyTable rows={fruitRows} current={cfg.fruitStrategy} />
             </Card>
-            <Card title="Produce flow" subtitle="Home-grown produce settled against gardener payments, per day">
+            <Card
+              title="Produce flow"
+              subtitle="Home-grown produce settled against gardener payments, per day"
+            >
               {proj.day.produceFlow.filter((p) => p.needed > 0 || p.produced > 0).length === 0 ? (
                 <p className="py-6 text-center text-xs text-slate-500">No gardener payments owed.</p>
               ) : (
@@ -681,8 +924,8 @@ export default function Planner({
                         key={p.item}
                         className="rounded-md border border-white/10 bg-slate-950/50 px-3 py-2 text-[11px] text-slate-400"
                       >
-                        <span className="text-slate-200">{ITEM_NAMES[p.item]}</span>: {fmtNum(p.produced, 1)}/day
-                        grown, {fmtNum(p.needed, 1)}/day owed &rarr;{' '}
+                        <span className="text-slate-200">{ITEM_NAMES[p.item]}</span>: {fmtNum(p.produced, 1)}
+                        /day grown, {fmtNum(p.needed, 1)}/day owed &rarr;{' '}
                         {p.bought > 0 ? (
                           <span className="text-rose-400">{fmtNum(p.bought, 1)} bought</span>
                         ) : p.spare > 0 ? (
@@ -701,38 +944,44 @@ export default function Planner({
           <Card title="Assumptions">
             <ul className="space-y-1 text-[11px] leading-relaxed text-slate-400">
               <li>
-                Each patch type runs on its own cadence, so days — not runs — are the base unit. A cadence starts at one
-                trip a day (two for herbs) and is capped by growth time, which is why hardwoods land below 1/day.
+                Each patch type runs on its own cadence, so days — not runs — are the base unit. A cadence
+                starts at one trip a day (two for herbs) and is capped by growth time, which is why hardwoods
+                land below 1/day.
               </li>
               <li>
                 Disease is rolled once per vulnerable growth cycle. The published figures are the{' '}
-                <span className="text-slate-300">maximum roll</span>, and 0 also counts as diseased, so the real chance
-                is (max + 1)/128. Compost divides the max roll by 50/80/90% and rounds down.
+                <span className="text-slate-300">maximum roll</span>, and 0 also counts as diseased, so the
+                real chance is (max + 1)/128. Compost divides the max roll by 50/80/90% and rounds down.
               </li>
               <li>
-                That means nothing is ever disease-immune. Ultracompost takes a {tree.name.toLowerCase()} tree&apos;s
-                max roll to 0, but the 0 outcome still lands — 1/128 a cycle over {tree.stages - 1} cycles. Player
-                testing on the wiki&apos;s Talk:Disease page measured ~6.9% disease for ultracomposted herbs, which this
-                reproduces; reading the figures as a plain chance predicts 4.6%.
+                That means nothing is ever disease-immune. Ultracompost takes a {tree.name.toLowerCase()}{' '}
+                tree&apos;s max roll to 0, but the 0 outcome still lands — 1/128 a cycle over{' '}
+                {tree.stages - 1} cycles. Player testing on the wiki&apos;s Talk:Disease page measured ~6.9%
+                disease for ultracomposted herbs, which this reproduces; reading the figures as a plain chance
+                predicts 4.6%.
               </li>
               <li>
-                Only maple (13/128) and magic (9/128) tree rates are published. Oak, willow, yew and every hardwood use
-                the <span className="text-slate-300">base = 20 − cycles</span> pattern those two define.
+                Only maple (13/128) and magic (9/128) tree rates are published. Oak, willow, yew and every
+                hardwood use the <span className="text-slate-300">base = 20 − cycles</span> pattern those two
+                define.
               </li>
               <li>
-                A diseased tree you do not cure before your next visit dies: you lose the seed and all of its XP. Paying
-                the gardener removes disease entirely.
+                A diseased tree you do not cure before your next visit dies: you lose the seed and all of its
+                XP. Paying the gardener removes disease entirely.
               </li>
               <li>
-                Herb yield is lives ÷ (1 − chance to save), +1 life per compost tier. Every herb reaches a 31.6% save
-                chance at 99. Magic secateurs (+10%) and the Farming cape (+5%, assumed at 99) raise that save chance
-                rather than the yield directly, and stack additively.
+                Herb yield is lives ÷ (1 − chance to save), +1 life per compost tier. Every herb reaches a
+                31.6% save chance at 99. Magic secateurs (+10%) and the Farming cape (+5%, assumed at 99)
+                raise that save chance rather than the yield directly, and stack additively.
               </li>
               <li>
-                Roots step every 8 Farming levels from the tree&apos;s requirement, capping at 4; felling a tree yields
-                ~8 logs. Hardwood trees have no roots item, so logs are their only produce.
+                Roots step every 8 Farming levels from the tree&apos;s requirement, capping at 4; felling a
+                tree yields ~8 logs. Hardwood trees have no roots item, so logs are their only produce.
               </li>
-              <li>Prices are the midpoint of the latest instant-buy and instant-sell from the OSRS Wiki price API.</li>
+              <li>
+                Prices are the midpoint of the latest instant-buy and instant-sell from the OSRS Wiki price
+                API.
+              </li>
             </ul>
           </Card>
         </div>
@@ -798,7 +1047,13 @@ function RunsPerDayField({
   const ceiling = maxRunsPerDay(growthMinutes);
   return (
     <Field label="Runs / day" hint={`max ${ceiling < 1 ? ceiling.toFixed(2) : fmtNum(ceiling, 1)}`}>
-      <NumberField value={value} onChange={onChange} min={0} max={Math.round(ceiling * 100) / 100} step={0.25} />
+      <NumberField
+        value={value}
+        onChange={onChange}
+        min={0}
+        max={Math.round(ceiling * 100) / 100}
+        step={0.25}
+      />
     </Field>
   );
 }
@@ -826,12 +1081,18 @@ function applyLevelGating(cfg: Config): Config {
     hardwoodType,
     // Cadence follows the crop, so re-derive it when gating swaps the type out.
     treeRunsPerDay:
-      treeType === cfg.treeType ? cfg.treeRunsPerDay : defaultRunsPerDay('tree', TREES[treeType].growthMinutes),
+      treeType === cfg.treeType
+        ? cfg.treeRunsPerDay
+        : defaultRunsPerDay('tree', TREES[treeType].growthMinutes),
     hardwoodRunsPerDay:
       hardwoodType === cfg.hardwoodType
         ? cfg.hardwoodRunsPerDay
         : defaultRunsPerDay('hardwood', HARDWOOD_TREES[hardwoodType].growthMinutes),
-    fruitType: bestFor(Object.keys(FRUIT_TREES) as FruitTreeKey[], (k) => FRUIT_TREES[k].level, cfg.fruitType),
+    fruitType: bestFor(
+      Object.keys(FRUIT_TREES) as FruitTreeKey[],
+      (k) => FRUIT_TREES[k].level,
+      cfg.fruitType,
+    ),
     herbType: bestFor(Object.keys(HERBS) as HerbKey[], (k) => HERBS[k].level, cfg.herbType),
   };
 }

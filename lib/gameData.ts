@@ -231,10 +231,30 @@ export const ITEM_NAMES: Record<ItemKey, string> = {
 /* ------------------------------------------------------------------ */
 
 export const COMPOST = {
-  none: { label: 'No compost', diseaseReduction: 0, extraLives: 0, item: null as ItemKey | null },
-  compost: { label: 'Compost', diseaseReduction: 0.5, extraLives: 1, item: 'compost' as ItemKey | null },
-  supercompost: { label: 'Supercompost', diseaseReduction: 0.8, extraLives: 2, item: 'supercompost' as ItemKey | null },
-  ultracompost: { label: 'Ultracompost', diseaseReduction: 0.9, extraLives: 3, item: 'ultracompost' as ItemKey | null },
+  none: {
+    label: 'No compost',
+    diseaseReduction: 0,
+    extraLives: 0,
+    item: null as ItemKey | null,
+  },
+  compost: {
+    label: 'Compost',
+    diseaseReduction: 0.5,
+    extraLives: 1,
+    item: 'compost' as ItemKey | null,
+  },
+  supercompost: {
+    label: 'Supercompost',
+    diseaseReduction: 0.8,
+    extraLives: 2,
+    item: 'supercompost' as ItemKey | null,
+  },
+  ultracompost: {
+    label: 'Ultracompost',
+    diseaseReduction: 0.9,
+    extraLives: 3,
+    item: 'ultracompost' as ItemKey | null,
+  },
 } as const;
 
 export type CompostTier = keyof typeof COMPOST;
@@ -300,29 +320,74 @@ export interface TreeDef {
  */
 export const TREES = {
   oak: {
-    name: 'Oak', level: 15, plantXp: 14, checkXp: 467.3, stages: 4, growthMinutes: 160,
-    diseaseBase128: 17, payItem: 'tomatoes5', payQty: 1,
-    seedItem: 'acorn', rootsItem: 'oakRoots', logsItem: 'oakLogs',
+    name: 'Oak',
+    level: 15,
+    plantXp: 14,
+    checkXp: 467.3,
+    stages: 4,
+    growthMinutes: 160,
+    diseaseBase128: 17,
+    payItem: 'tomatoes5',
+    payQty: 1,
+    seedItem: 'acorn',
+    rootsItem: 'oakRoots',
+    logsItem: 'oakLogs',
   },
   willow: {
-    name: 'Willow', level: 30, plantXp: 25, checkXp: 1456.5, stages: 6, growthMinutes: 240,
-    diseaseBase128: 15, payItem: 'apples5', payQty: 1,
-    seedItem: 'willowSeed', rootsItem: 'willowRoots', logsItem: 'willowLogs',
+    name: 'Willow',
+    level: 30,
+    plantXp: 25,
+    checkXp: 1456.5,
+    stages: 6,
+    growthMinutes: 240,
+    diseaseBase128: 15,
+    payItem: 'apples5',
+    payQty: 1,
+    seedItem: 'willowSeed',
+    rootsItem: 'willowRoots',
+    logsItem: 'willowLogs',
   },
   maple: {
-    name: 'Maple', level: 45, plantXp: 45, checkXp: 3403.4, stages: 8, growthMinutes: 320,
-    diseaseBase128: 13, payItem: 'oranges5', payQty: 1,
-    seedItem: 'mapleSeed', rootsItem: 'mapleRoots', logsItem: 'mapleLogs',
+    name: 'Maple',
+    level: 45,
+    plantXp: 45,
+    checkXp: 3403.4,
+    stages: 8,
+    growthMinutes: 320,
+    diseaseBase128: 13,
+    payItem: 'oranges5',
+    payQty: 1,
+    seedItem: 'mapleSeed',
+    rootsItem: 'mapleRoots',
+    logsItem: 'mapleLogs',
   },
   yew: {
-    name: 'Yew', level: 60, plantXp: 81, checkXp: 7069.9, stages: 10, growthMinutes: 400,
-    diseaseBase128: 11, payItem: 'cactusSpine', payQty: 10,
-    seedItem: 'yewSeed', rootsItem: 'yewRoots', logsItem: 'yewLogs',
+    name: 'Yew',
+    level: 60,
+    plantXp: 81,
+    checkXp: 7069.9,
+    stages: 10,
+    growthMinutes: 400,
+    diseaseBase128: 11,
+    payItem: 'cactusSpine',
+    payQty: 10,
+    seedItem: 'yewSeed',
+    rootsItem: 'yewRoots',
+    logsItem: 'yewLogs',
   },
   magic: {
-    name: 'Magic', level: 75, plantXp: 145.5, checkXp: 13768.3, stages: 12, growthMinutes: 480,
-    diseaseBase128: 9, payItem: 'coconut', payQty: 25,
-    seedItem: 'magicSeed', rootsItem: 'magicRoots', logsItem: 'magicLogs',
+    name: 'Magic',
+    level: 75,
+    plantXp: 145.5,
+    checkXp: 13768.3,
+    stages: 12,
+    growthMinutes: 480,
+    diseaseBase128: 9,
+    payItem: 'coconut',
+    payQty: 25,
+    seedItem: 'magicSeed',
+    rootsItem: 'magicRoots',
+    logsItem: 'magicLogs',
   },
 } as const satisfies Record<string, TreeDef>;
 
@@ -374,29 +439,69 @@ export interface HardwoodDef {
  */
 export const HARDWOOD_TREES = {
   teak: {
-    name: 'Teak', level: 35, plantXp: 35, checkXp: 7290, stages: 7, growthMinutes: 4480,
-    diseaseBase128: 14, payItem: 'limpwurtRoot', payQty: 15,
-    seedItem: 'teakSeed', logsItem: 'teakLogs',
+    name: 'Teak',
+    level: 35,
+    plantXp: 35,
+    checkXp: 7290,
+    stages: 7,
+    growthMinutes: 4480,
+    diseaseBase128: 14,
+    payItem: 'limpwurtRoot',
+    payQty: 15,
+    seedItem: 'teakSeed',
+    logsItem: 'teakLogs',
   },
   mahogany: {
-    name: 'Mahogany', level: 55, plantXp: 63, checkXp: 15720, stages: 8, growthMinutes: 5120,
-    diseaseBase128: 13, payItem: 'yanillianHops', payQty: 25,
-    seedItem: 'mahoganySeed', logsItem: 'mahoganyLogs',
+    name: 'Mahogany',
+    level: 55,
+    plantXp: 63,
+    checkXp: 15720,
+    stages: 8,
+    growthMinutes: 5120,
+    diseaseBase128: 13,
+    payItem: 'yanillianHops',
+    payQty: 25,
+    seedItem: 'mahoganySeed',
+    logsItem: 'mahoganyLogs',
   },
   camphor: {
-    name: 'Camphor', level: 66, plantXp: 88, checkXp: 17840, stages: 8, growthMinutes: 5120,
-    diseaseBase128: 13, payItem: 'whiteBerries', payQty: 10,
-    seedItem: 'camphorSeed', logsItem: 'camphorLogs',
+    name: 'Camphor',
+    level: 66,
+    plantXp: 88,
+    checkXp: 17840,
+    stages: 8,
+    growthMinutes: 5120,
+    diseaseBase128: 13,
+    payItem: 'whiteBerries',
+    payQty: 10,
+    seedItem: 'camphorSeed',
+    logsItem: 'camphorLogs',
   },
   ironwood: {
-    name: 'Ironwood', level: 80, plantXp: 145, checkXp: 20380, stages: 8, growthMinutes: 5120,
-    diseaseBase128: 13, payItem: 'curryLeaf', payQty: 10,
-    seedItem: 'ironwoodSeed', logsItem: 'ironwoodLogs',
+    name: 'Ironwood',
+    level: 80,
+    plantXp: 145,
+    checkXp: 20380,
+    stages: 8,
+    growthMinutes: 5120,
+    diseaseBase128: 13,
+    payItem: 'curryLeaf',
+    payQty: 10,
+    seedItem: 'ironwoodSeed',
+    logsItem: 'ironwoodLogs',
   },
   rosewood: {
-    name: 'Rosewood', level: 92, plantXp: 252, checkXp: 23100, stages: 9, growthMinutes: 5760,
-    diseaseBase128: 12, payItem: 'dragonfruit', payQty: 8,
-    seedItem: 'rosewoodSeed', logsItem: 'rosewoodLogs',
+    name: 'Rosewood',
+    level: 92,
+    plantXp: 252,
+    checkXp: 23100,
+    stages: 9,
+    growthMinutes: 5760,
+    diseaseBase128: 12,
+    payItem: 'dragonfruit',
+    payQty: 8,
+    seedItem: 'rosewoodSeed',
+    logsItem: 'rosewoodLogs',
   },
 } as const satisfies Record<string, HardwoodDef>;
 
@@ -427,36 +532,92 @@ export const FRUIT_PER_CYCLE = 6;
 
 export const FRUIT_TREES = {
   apple: {
-    name: 'Apple', level: 27, plantXp: 22, checkXp: 1199.5, harvestXpPerFruit: 8.5,
-    payItem: 'sweetcorn', payQty: 9, seedItem: 'appleSeed', fruitItem: 'cookingApple',
+    name: 'Apple',
+    level: 27,
+    plantXp: 22,
+    checkXp: 1199.5,
+    harvestXpPerFruit: 8.5,
+    payItem: 'sweetcorn',
+    payQty: 9,
+    seedItem: 'appleSeed',
+    fruitItem: 'cookingApple',
   },
   banana: {
-    name: 'Banana', level: 33, plantXp: 28, checkXp: 1750.5, harvestXpPerFruit: 10.5,
-    payItem: 'apples5', payQty: 4, seedItem: 'bananaSeed', fruitItem: 'banana',
+    name: 'Banana',
+    level: 33,
+    plantXp: 28,
+    checkXp: 1750.5,
+    harvestXpPerFruit: 10.5,
+    payItem: 'apples5',
+    payQty: 4,
+    seedItem: 'bananaSeed',
+    fruitItem: 'banana',
   },
   orange: {
-    name: 'Orange', level: 39, plantXp: 35.5, checkXp: 2470.2, harvestXpPerFruit: 13.5,
-    payItem: 'strawberries5', payQty: 3, seedItem: 'orangeSeed', fruitItem: 'orange',
+    name: 'Orange',
+    level: 39,
+    plantXp: 35.5,
+    checkXp: 2470.2,
+    harvestXpPerFruit: 13.5,
+    payItem: 'strawberries5',
+    payQty: 3,
+    seedItem: 'orangeSeed',
+    fruitItem: 'orange',
   },
   curry: {
-    name: 'Curry', level: 42, plantXp: 40, checkXp: 2906.9, harvestXpPerFruit: 15,
-    payItem: 'bananas5', payQty: 5, seedItem: 'currySeed', fruitItem: 'curryLeaf',
+    name: 'Curry',
+    level: 42,
+    plantXp: 40,
+    checkXp: 2906.9,
+    harvestXpPerFruit: 15,
+    payItem: 'bananas5',
+    payQty: 5,
+    seedItem: 'currySeed',
+    fruitItem: 'curryLeaf',
   },
   pineapple: {
-    name: 'Pineapple', level: 51, plantXp: 57, checkXp: 4605.7, harvestXpPerFruit: 21.5,
-    payItem: 'watermelon', payQty: 10, seedItem: 'pineappleSeed', fruitItem: 'pineapple',
+    name: 'Pineapple',
+    level: 51,
+    plantXp: 57,
+    checkXp: 4605.7,
+    harvestXpPerFruit: 21.5,
+    payItem: 'watermelon',
+    payQty: 10,
+    seedItem: 'pineappleSeed',
+    fruitItem: 'pineapple',
   },
   papaya: {
-    name: 'Papaya', level: 57, plantXp: 72, checkXp: 6146.6, harvestXpPerFruit: 27,
-    payItem: 'pineapple', payQty: 10, seedItem: 'papayaSeed', fruitItem: 'papaya',
+    name: 'Papaya',
+    level: 57,
+    plantXp: 72,
+    checkXp: 6146.6,
+    harvestXpPerFruit: 27,
+    payItem: 'pineapple',
+    payQty: 10,
+    seedItem: 'papayaSeed',
+    fruitItem: 'papaya',
   },
   palm: {
-    name: 'Palm (coconut)', level: 68, plantXp: 110.5, checkXp: 10150.1, harvestXpPerFruit: 41.5,
-    payItem: 'papaya', payQty: 15, seedItem: 'palmSeed', fruitItem: 'coconut',
+    name: 'Palm (coconut)',
+    level: 68,
+    plantXp: 110.5,
+    checkXp: 10150.1,
+    harvestXpPerFruit: 41.5,
+    payItem: 'papaya',
+    payQty: 15,
+    seedItem: 'palmSeed',
+    fruitItem: 'coconut',
   },
   dragonfruit: {
-    name: 'Dragonfruit', level: 81, plantXp: 140, checkXp: 17335, harvestXpPerFruit: 70,
-    payItem: 'coconut', payQty: 15, seedItem: 'dragonfruitSeed', fruitItem: 'dragonfruit',
+    name: 'Dragonfruit',
+    level: 81,
+    plantXp: 140,
+    checkXp: 17335,
+    harvestXpPerFruit: 70,
+    payItem: 'coconut',
+    payQty: 15,
+    seedItem: 'dragonfruitSeed',
+    fruitItem: 'dragonfruit',
   },
 } as const satisfies Record<string, FruitTreeDef>;
 
@@ -514,20 +675,132 @@ export const HERB_DISEASE_CYCLES = 3;
 export const HERB_GROWTH_MINUTES = 80;
 
 export const HERBS = {
-  guam: { name: 'Guam', level: 9, plantXp: 11, harvestXp: 12.5, ctsLow: 0.102, seedItem: 'guamSeed', productItem: 'grimyGuam' },
-  marrentill: { name: 'Marrentill', level: 14, plantXp: 13.5, harvestXp: 15, ctsLow: 0.113, seedItem: 'marrentillSeed', productItem: 'grimyMarrentill' },
-  tarromin: { name: 'Tarromin', level: 19, plantXp: 16, harvestXp: 18, ctsLow: 0.125, seedItem: 'tarrominSeed', productItem: 'grimyTarromin' },
-  harralander: { name: 'Harralander', level: 26, plantXp: 21.5, harvestXp: 24, ctsLow: 0.145, seedItem: 'harralanderSeed', productItem: 'grimyHarralander' },
-  ranarr: { name: 'Ranarr weed', level: 32, plantXp: 26.5, harvestXp: 30.5, ctsLow: 0.156, seedItem: 'ranarrSeed', productItem: 'grimyRanarr' },
-  toadflax: { name: 'Toadflax', level: 38, plantXp: 34, harvestXp: 38.5, ctsLow: 0.172, seedItem: 'toadflaxSeed', productItem: 'grimyToadflax' },
-  irit: { name: 'Irit', level: 44, plantXp: 43, harvestXp: 48.5, ctsLow: 0.184, seedItem: 'iritSeed', productItem: 'grimyIrit' },
-  avantoe: { name: 'Avantoe', level: 50, plantXp: 54.5, harvestXp: 61.5, ctsLow: 0.199, seedItem: 'avantoeSeed', productItem: 'grimyAvantoe' },
-  kwuarm: { name: 'Kwuarm', level: 56, plantXp: 69, harvestXp: 78, ctsLow: 0.215, seedItem: 'kwuarmSeed', productItem: 'grimyKwuarm' },
-  snapdragon: { name: 'Snapdragon', level: 62, plantXp: 87.5, harvestXp: 98.5, ctsLow: 0.227, seedItem: 'snapdragonSeed', productItem: 'grimySnapdragon' },
-  cadantine: { name: 'Cadantine', level: 67, plantXp: 106.5, harvestXp: 120, ctsLow: 0.238, seedItem: 'cadantineSeed', productItem: 'grimyCadantine' },
-  lantadyme: { name: 'Lantadyme', level: 73, plantXp: 134.5, harvestXp: 151.5, ctsLow: 0.254, seedItem: 'lantadymeSeed', productItem: 'grimyLantadyme' },
-  dwarfWeed: { name: 'Dwarf weed', level: 79, plantXp: 170.5, harvestXp: 192, ctsLow: 0.266, seedItem: 'dwarfWeedSeed', productItem: 'grimyDwarfWeed' },
-  torstol: { name: 'Torstol', level: 85, plantXp: 199.5, harvestXp: 224.5, ctsLow: 0.281, seedItem: 'torstolSeed', productItem: 'grimyTorstol' },
+  guam: {
+    name: 'Guam',
+    level: 9,
+    plantXp: 11,
+    harvestXp: 12.5,
+    ctsLow: 0.102,
+    seedItem: 'guamSeed',
+    productItem: 'grimyGuam',
+  },
+  marrentill: {
+    name: 'Marrentill',
+    level: 14,
+    plantXp: 13.5,
+    harvestXp: 15,
+    ctsLow: 0.113,
+    seedItem: 'marrentillSeed',
+    productItem: 'grimyMarrentill',
+  },
+  tarromin: {
+    name: 'Tarromin',
+    level: 19,
+    plantXp: 16,
+    harvestXp: 18,
+    ctsLow: 0.125,
+    seedItem: 'tarrominSeed',
+    productItem: 'grimyTarromin',
+  },
+  harralander: {
+    name: 'Harralander',
+    level: 26,
+    plantXp: 21.5,
+    harvestXp: 24,
+    ctsLow: 0.145,
+    seedItem: 'harralanderSeed',
+    productItem: 'grimyHarralander',
+  },
+  ranarr: {
+    name: 'Ranarr weed',
+    level: 32,
+    plantXp: 26.5,
+    harvestXp: 30.5,
+    ctsLow: 0.156,
+    seedItem: 'ranarrSeed',
+    productItem: 'grimyRanarr',
+  },
+  toadflax: {
+    name: 'Toadflax',
+    level: 38,
+    plantXp: 34,
+    harvestXp: 38.5,
+    ctsLow: 0.172,
+    seedItem: 'toadflaxSeed',
+    productItem: 'grimyToadflax',
+  },
+  irit: {
+    name: 'Irit',
+    level: 44,
+    plantXp: 43,
+    harvestXp: 48.5,
+    ctsLow: 0.184,
+    seedItem: 'iritSeed',
+    productItem: 'grimyIrit',
+  },
+  avantoe: {
+    name: 'Avantoe',
+    level: 50,
+    plantXp: 54.5,
+    harvestXp: 61.5,
+    ctsLow: 0.199,
+    seedItem: 'avantoeSeed',
+    productItem: 'grimyAvantoe',
+  },
+  kwuarm: {
+    name: 'Kwuarm',
+    level: 56,
+    plantXp: 69,
+    harvestXp: 78,
+    ctsLow: 0.215,
+    seedItem: 'kwuarmSeed',
+    productItem: 'grimyKwuarm',
+  },
+  snapdragon: {
+    name: 'Snapdragon',
+    level: 62,
+    plantXp: 87.5,
+    harvestXp: 98.5,
+    ctsLow: 0.227,
+    seedItem: 'snapdragonSeed',
+    productItem: 'grimySnapdragon',
+  },
+  cadantine: {
+    name: 'Cadantine',
+    level: 67,
+    plantXp: 106.5,
+    harvestXp: 120,
+    ctsLow: 0.238,
+    seedItem: 'cadantineSeed',
+    productItem: 'grimyCadantine',
+  },
+  lantadyme: {
+    name: 'Lantadyme',
+    level: 73,
+    plantXp: 134.5,
+    harvestXp: 151.5,
+    ctsLow: 0.254,
+    seedItem: 'lantadymeSeed',
+    productItem: 'grimyLantadyme',
+  },
+  dwarfWeed: {
+    name: 'Dwarf weed',
+    level: 79,
+    plantXp: 170.5,
+    harvestXp: 192,
+    ctsLow: 0.266,
+    seedItem: 'dwarfWeedSeed',
+    productItem: 'grimyDwarfWeed',
+  },
+  torstol: {
+    name: 'Torstol',
+    level: 85,
+    plantXp: 199.5,
+    harvestXp: 224.5,
+    ctsLow: 0.281,
+    seedItem: 'torstolSeed',
+    productItem: 'grimyTorstol',
+  },
 } as const satisfies Record<string, HerbDef>;
 
 export type HerbKey = keyof typeof HERBS;
@@ -610,7 +883,12 @@ export function yieldBonusPct(secateurs: SecateursKey, farmingLevel: number): nu
 }
 
 /** Patch counts available in game, used as slider maximums. */
-export const MAX_PATCHES = { tree: 7, fruitTree: 7, hardwood: 3, herb: 10 } as const;
+export const MAX_PATCHES = {
+  tree: 7,
+  fruitTree: 7,
+  hardwood: 3,
+  herb: 10,
+} as const;
 
 /* ------------------------------------------------------------------ */
 /* Run cadence                                                         */
@@ -626,7 +904,12 @@ const MINUTES_PER_DAY = 1440;
  * a day for trees, two for herbs. Hardwoods take 3-4 days, so the ceiling binds
  * and you get a fraction of a run per day.
  */
-export const RUN_CONVENTION = { tree: 1, fruitTree: 1, hardwood: 1, herb: 2 } as const;
+export const RUN_CONVENTION = {
+  tree: 1,
+  fruitTree: 1,
+  hardwood: 1,
+  herb: 2,
+} as const;
 
 export type PatchKind = keyof typeof RUN_CONVENTION;
 
@@ -652,3 +935,27 @@ export const MINUTES_PER_PATCH = 1.5;
 export function minutesPerRun(patches: number): number {
   return patches > 0 ? MINUTES_PER_RUN_OVERHEAD + patches * MINUTES_PER_PATCH : 0;
 }
+
+/* ------------------------------------------------------------------ */
+/* Clearing a patch                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A grown tree has to come out before you can replant. Either fell it yourself
+ * — logs from chopping, roots from digging the stump — or pay a gardener 200 gp
+ * to remove it instantly, which yields neither.
+ *
+ * This is separate from the protection payment: paying 25 coconuts stops the
+ * tree getting diseased while it grows, and does nothing at clearing time.
+ */
+export const CLEAR_PATCH_FEE = 200;
+
+/** Rough time to fell one farmed tree and dig out the stump. */
+export const MINUTES_TO_FELL_TREE = 1.5;
+
+export type ClearMethod = 'chop' | 'pay';
+
+export const CLEAR_METHOD_LABEL: Record<ClearMethod, string> = {
+  chop: 'Chop it yourself',
+  pay: `Pay ${CLEAR_PATCH_FEE} gp to clear`,
+};

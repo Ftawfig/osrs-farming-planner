@@ -16,8 +16,7 @@ const UPSTREAM = 'https://prices.runescape.wiki/api/v1/osrs/latest';
  * The wiki asks for a descriptive User-Agent so they can contact you if your
  * client misbehaves. Override via PRICE_API_USER_AGENT in your Vercel env vars.
  */
-const USER_AGENT =
-  process.env.PRICE_API_USER_AGENT ?? 'osrs-farming-calc/1.0 (personal farming calculator)';
+const USER_AGENT = process.env.PRICE_API_USER_AGENT ?? 'osrs-farming-calc/1.0 (personal farming calculator)';
 
 /** Snapshot taken 2026-07-31, used when the upstream API is unreachable. */
 export const FALLBACK_PRICES: Record<ItemKey, number> = {

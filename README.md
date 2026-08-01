@@ -17,6 +17,23 @@ is clamped to the same growth ceiling.
 Because tree and fruit runs no longer happen together, gardener payments are
 settled against home-grown produce **per day** rather than per run.
 
+## Pages
+
+- **Planner** (`/`) — your actual setup, projected to a target level. Each patch
+  type can be switched out of the model entirely without losing its settings.
+- **Crop rates** (`/compare`) — every farmable crop rated against the others,
+  one patch at a time, at the cadence its growth time allows. Per-patch figures,
+  so they don't depend on how many patches you run.
+
+## Clearing a patch
+
+A grown tree has to come out before you can replant. Either fell it yourself —
+logs from chopping, roots from digging the stump — or pay a gardener 200 gp to
+remove it instantly, which yields neither and disables both sell toggles.
+
+This is separate from the protection payment: 25 coconuts stops a magic tree
+getting diseased while it grows and does nothing at clearing time.
+
 ## What it models
 
 - **XP and time** — XP per run and per day for each patch type, days to the next

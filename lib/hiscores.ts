@@ -3,8 +3,7 @@ export const DEFAULT_RSN = process.env.DEFAULT_RSN ?? 'Grixwell';
 
 const UPSTREAM = 'https://secure.runescape.com/m=hiscore_oldschool/index_lite.json';
 
-const USER_AGENT =
-  process.env.PRICE_API_USER_AGENT ?? 'osrs-farming-calc/1.0 (personal farming calculator)';
+const USER_AGENT = process.env.PRICE_API_USER_AGENT ?? 'osrs-farming-calc/1.0 (personal farming calculator)';
 
 /** OSRS names: 1-12 chars, letters/digits/space/underscore/hyphen. */
 export const RSN_PATTERN = /^[A-Za-z0-9 _-]{1,12}$/;
@@ -16,9 +15,7 @@ export interface Player {
   rank: number;
 }
 
-export type HiscoreResult =
-  | { ok: true; player: Player }
-  | { ok: false; error: string; status: number };
+export type HiscoreResult = { ok: true; player: Player } | { ok: false; error: string; status: number };
 
 interface HiscoreSkill {
   id: number;

@@ -12,10 +12,6 @@ export default async function Page() {
   const [prices, hiscores] = await Promise.all([fetchPrices(), fetchHiscores(DEFAULT_RSN, 300)]);
 
   return (
-    <Planner
-      initial={prices}
-      defaultRsn={DEFAULT_RSN}
-      initialPlayer={hiscores.ok ? hiscores.player : null}
-    />
+    <Planner initial={prices} defaultRsn={DEFAULT_RSN} initialPlayer={hiscores.ok ? hiscores.player : null} />
   );
 }

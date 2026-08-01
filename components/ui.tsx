@@ -22,7 +22,9 @@ export function Card({
       {(title || actions) && (
         <header className="mb-3 flex items-start justify-between gap-3">
           <div>
-            {title && <h2 className="text-sm font-semibold tracking-wide text-amber-300/90 uppercase">{title}</h2>}
+            {title && (
+              <h2 className="text-sm font-semibold tracking-wide text-amber-300/90 uppercase">{title}</h2>
+            )}
             {subtitle && <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>}
           </div>
           {actions}
@@ -190,23 +192,30 @@ export function Toggle({
   onChange,
   label,
   hint,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (b: boolean) => void;
   label: string;
   hint?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center gap-2.5 rounded-md border border-white/10 bg-slate-950/70 px-2.5 py-2 text-left transition hover:border-white/20"
+      className={`flex w-full items-center gap-2.5 rounded-md border border-white/10 bg-slate-950/70 px-2.5 py-2 text-left transition ${
+        disabled ? 'cursor-not-allowed opacity-45' : 'hover:border-white/20'
+      }`}
     >
       <span
-        className={`relative h-4 w-7 shrink-0 rounded-full transition ${checked ? 'bg-amber-400' : 'bg-slate-700'}`}
+        className={`relative h-4 w-7 shrink-0 rounded-full transition ${
+          checked && !disabled ? 'bg-amber-400' : 'bg-slate-700'
+        }`}
       >
         <span
-          className={`absolute top-0.5 h-3 w-3 rounded-full bg-slate-950 transition ${checked ? 'left-3.5' : 'left-0.5'}`}
+          className={`absolute top-0.5 h-3 w-3 rounded-full bg-slate-950 transition ${checked && !disabled ? 'left-3.5' : 'left-0.5'}`}
         />
       </span>
       <span className="min-w-0">

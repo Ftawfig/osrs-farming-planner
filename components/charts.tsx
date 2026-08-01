@@ -95,7 +95,14 @@ export function XpProgressChart({ data, levelUps }: { data: TimelinePoint[]; lev
           labelFormatter={(v: unknown) => `Day ${num(v).toFixed(1)}`}
           formatter={(value: unknown): [string, string] => [`${fmtNum(num(value))} xp`, 'Total XP']}
         />
-        <Area type="monotone" dataKey="xp" stroke={COLORS.level} strokeWidth={2} fill="url(#xpFill)" dot={false} />
+        <Area
+          type="monotone"
+          dataKey="xp"
+          stroke={COLORS.level}
+          strokeWidth={2}
+          fill="url(#xpFill)"
+          dot={false}
+        />
         {marks.map((l) => (
           <ReferenceDot
             key={l.level}
@@ -128,7 +135,13 @@ export function BankChart({ data }: { data: TimelinePoint[] }) {
           axisLine={{ stroke: GRID }}
           tickFormatter={(v: number) => `d${Math.round(v)}`}
         />
-        <YAxis tick={AXIS} tickLine={false} axisLine={false} tickFormatter={(v: number) => fmtGp(v)} width={54} />
+        <YAxis
+          tick={AXIS}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={(v: number) => fmtGp(v)}
+          width={54}
+        />
         <Tooltip
           {...tooltipStyle}
           labelFormatter={(v: unknown) => `Day ${num(v).toFixed(1)}`}
@@ -158,7 +171,10 @@ export function DaysPerLevelChart({ levelUps }: { levelUps: LevelUp[] }) {
         <Tooltip
           {...tooltipStyle}
           labelFormatter={(v: unknown) => `Level ${String(v)}`}
-          formatter={(value: unknown): [string, string] => [`${num(value).toFixed(1)} days`, 'For this level']}
+          formatter={(value: unknown): [string, string] => [
+            `${num(value).toFixed(1)} days`,
+            'For this level',
+          ]}
         />
         <Bar dataKey="days" fill={COLORS.level} radius={[4, 4, 0, 0]} />
       </BarChart>
@@ -172,7 +188,13 @@ export function StrategyChart({ rows, highlight }: { rows: StrategyRow[]; highli
     <ResponsiveContainer width="100%" height={200}>
       <BarChart data={data} margin={{ top: 5, right: 8, left: 4, bottom: 0 }} layout="vertical">
         <CartesianGrid stroke={GRID} horizontal={false} />
-        <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} tickFormatter={(v: number) => fmtGp(v)} />
+        <XAxis
+          type="number"
+          tick={AXIS}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={(v: number) => fmtGp(v)}
+        />
         <YAxis type="category" dataKey="name" tick={AXIS} tickLine={false} axisLine={false} width={124} />
         <Tooltip
           {...tooltipStyle}
@@ -180,7 +202,10 @@ export function StrategyChart({ rows, highlight }: { rows: StrategyRow[]; highli
         />
         <Bar dataKey="cost" radius={[0, 4, 4, 0]}>
           {data.map((d) => (
-            <Cell key={d.strategy} fill={d.strategy === highlight ? COLORS.level : 'rgba(148,163,184,0.45)'} />
+            <Cell
+              key={d.strategy}
+              fill={d.strategy === highlight ? COLORS.level : 'rgba(148,163,184,0.45)'}
+            />
           ))}
         </Bar>
       </BarChart>
@@ -193,7 +218,13 @@ export function XpBreakdownChart({ data }: { data: { label: string; kind: string
     <ResponsiveContainer width="100%" height={210}>
       <BarChart data={data} margin={{ top: 5, right: 8, left: 4, bottom: 0 }} layout="vertical">
         <CartesianGrid stroke={GRID} horizontal={false} />
-        <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} tickFormatter={(v: number) => fmtGp(v)} />
+        <XAxis
+          type="number"
+          tick={AXIS}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={(v: number) => fmtGp(v)}
+        />
         <YAxis type="category" dataKey="label" tick={AXIS} tickLine={false} axisLine={false} width={118} />
         <Tooltip
           {...tooltipStyle}
@@ -215,10 +246,19 @@ export function CropEconomyChart({ data }: { data: { label: string; cost: number
       <BarChart data={data} margin={{ top: 5, right: 8, left: 4, bottom: 0 }}>
         <CartesianGrid stroke={GRID} vertical={false} />
         <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={{ stroke: GRID }} />
-        <YAxis tick={AXIS} tickLine={false} axisLine={false} tickFormatter={(v: number) => fmtGp(v)} width={54} />
+        <YAxis
+          tick={AXIS}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={(v: number) => fmtGp(v)}
+          width={54}
+        />
         <Tooltip
           {...tooltipStyle}
-          formatter={(value: unknown, name: unknown): [string, string] => [`${fmtGp(num(value))} gp`, String(name)]}
+          formatter={(value: unknown, name: unknown): [string, string] => [
+            `${fmtGp(num(value))} gp`,
+            String(name),
+          ]}
         />
         <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
         <Bar dataKey="cost" name="Cost" fill={COLORS.cost} radius={[4, 4, 0, 0]} />

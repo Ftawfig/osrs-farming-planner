@@ -26,6 +26,12 @@ a descriptive `User-Agent` as the wiki asks.
 - `app/api/hiscores/route.ts` — looks up a character's Farming XP from the
   official OSRS hiscores.
 
+The page loads a default character's stats server-side, so the first paint is
+already that account's numbers rather than a placeholder. Change who that is
+with the `DEFAULT_RSN` env var (it falls back to `Grixwell`); typing any other
+name and pressing Load still overrides it at runtime. If the lookup fails the
+planner falls back to `DEFAULT_CONFIG` instead of blocking.
+
 Set a contact string in `PRICE_API_USER_AGENT` so the wiki can reach you if the
 app ever misbehaves:
 

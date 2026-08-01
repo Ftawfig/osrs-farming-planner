@@ -43,6 +43,7 @@ import {
   fmtNum,
   project,
 } from '@/lib/model';
+import type { Player } from '@/lib/hiscores';
 import type { PricePayload } from '@/lib/prices';
 
 const STRATEGY_OPTIONS: { value: Strategy; label: string }[] = [
@@ -82,18 +83,32 @@ const priceKeysFor = (cfg: Config): ItemKey[] => {
 /** ISO string -> "HH:MM UTC". Avoids locale-dependent hydration mismatches. */
 const utcTime = (iso: string) => `${iso.slice(11, 16)} UTC`;
 
-export default function Planner({ initial }: { initial: PricePayload }) {
-  const [cfg, setCfg] = useState<Config>(DEFAULT_CONFIG);
+const playerSummary = (p: Player) => `${p.name}: level ${p.level} (${fmtNum(p.xp)} xp)`;
+
+export default function Planner({
+  initial,
+  defaultRsn,
+  initialPlayer,
+}: {
+  initial: PricePayload;
+  defaultRsn: string;
+  initialPlayer: Player | null;
+}) {
+  // Seed straight from the server-loaded character so the first paint is already
+  // that account's numbers, with DEFAULT_CONFIG as the fallback if the lookup failed.
+  const [cfg, setCfg] = useState<Config>(() =>
+    initialPlayer ? applyLevelGating({ ...DEFAULT_CONFIG, currentXp: initialPlayer.xp }) : DEFAULT_CONFIG,
+  );
   const [live, setLive] = useState<PriceMap>(initial.prices);
   const [overrides, setOverrides] = useState<Partial<Record<ItemKey, number>>>({});
   const [meta, setMeta] = useState({ source: initial.source, fetchedAt: initial.fetchedAt });
   const [loading, setLoading] = useState(false);
   const [showPrices, setShowPrices] = useState(false);
 
-  const [rsn, setRsn] = useState('');
-  const [rsnStatus, setRsnStatus] = useState<{ kind: 'idle' | 'loading' | 'ok' | 'error'; msg?: string }>({
-    kind: 'idle',
-  });
+  const [rsn, setRsn] = useState(defaultRsn);
+  const [rsnStatus, setRsnStatus] = useState<{ kind: 'idle' | 'loading' | 'ok' | 'error'; msg?: string }>(
+    initialPlayer ? { kind: 'ok', msg: playerSummary(initialPlayer) } : { kind: 'idle' },
+  );
 
   const set = <K extends keyof Config>(key: K, value: Config[K]) => setCfg((c) => ({ ...c, [key]: value }));
 
@@ -121,8 +136,9 @@ export default function Planner({ initial }: { initial: PricePayload }) {
         setRsnStatus({ kind: 'error', msg: json.error ?? 'Lookup failed.' });
         return;
       }
-      setCfg((c) => applyLevelGating({ ...c, currentXp: json.xp }));
-      setRsnStatus({ kind: 'ok', msg: `${json.name}: level ${json.level} (${fmtNum(json.xp)} xp)` });
+      const player = json as Player;
+      setCfg((c) => applyLevelGating({ ...c, currentXp: player.xp }));
+      setRsnStatus({ kind: 'ok', msg: playerSummary(player) });
     } catch {
       setRsnStatus({ kind: 'error', msg: 'Lookup failed.' });
     }

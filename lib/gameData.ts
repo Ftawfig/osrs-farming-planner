@@ -57,6 +57,22 @@ export const ITEMS = {
   mapleLogs: 1517,
   yewLogs: 1515,
   magicLogs: 1513,
+  // Hardwood tree seeds
+  teakSeed: 21486,
+  mahoganySeed: 21488,
+  camphorSeed: 31547,
+  ironwoodSeed: 31549,
+  rosewoodSeed: 31551,
+  // Hardwood logs
+  teakLogs: 6333,
+  mahoganyLogs: 6332,
+  camphorLogs: 32904,
+  ironwoodLogs: 32907,
+  rosewoodLogs: 32910,
+  // Hardwood protection payments
+  limpwurtRoot: 225,
+  yanillianHops: 5998,
+  whiteBerries: 239,
   // Fruit tree seeds
   appleSeed: 5283,
   bananaSeed: 5284,
@@ -139,6 +155,19 @@ export const ITEM_NAMES: Record<ItemKey, string> = {
   mapleLogs: 'Maple logs',
   yewLogs: 'Yew logs',
   magicLogs: 'Magic logs',
+  teakSeed: 'Teak seed',
+  mahoganySeed: 'Mahogany seed',
+  camphorSeed: 'Camphor seed',
+  ironwoodSeed: 'Ironwood seed',
+  rosewoodSeed: 'Rosewood seed',
+  teakLogs: 'Teak logs',
+  mahoganyLogs: 'Mahogany logs',
+  camphorLogs: 'Camphor logs',
+  ironwoodLogs: 'Ironwood logs',
+  rosewoodLogs: 'Rosewood logs',
+  limpwurtRoot: 'Limpwurt root',
+  yanillianHops: 'Yanillian hops',
+  whiteBerries: 'White berries',
   appleSeed: 'Apple tree seed',
   bananaSeed: 'Banana tree seed',
   orangeSeed: 'Orange tree seed',
@@ -312,6 +341,60 @@ export function rootsPerTree(tree: TreeDef, farmingLevel: number): number {
  */
 export const TREE_DEPLETE_CHANCE = 1 / 8;
 export const EXPECTED_LOGS_PER_TREE = 1 / TREE_DEPLETE_CHANCE;
+
+/* ------------------------------------------------------------------ */
+/* Hardwood trees                                                      */
+/* ------------------------------------------------------------------ */
+
+export interface HardwoodDef {
+  name: string;
+  level: number;
+  plantXp: number;
+  checkXp: number;
+  stages: number;
+  growthMinutes: number;
+  diseaseBase128: number;
+  payItem: ItemKey;
+  payQty: number;
+  seedItem: ItemKey;
+  logsItem: ItemKey;
+}
+
+/**
+ * Hardwood trees grow in the 3 hardwood patches (Fossil Island, Locus Oasis,
+ * Anglers' Retreat). They yield logs only — there is no hardwood roots item.
+ * Disease rates are unpublished, so these use the same base = 20 - cycles
+ * pattern as oak/willow/yew.
+ */
+export const HARDWOOD_TREES = {
+  teak: {
+    name: 'Teak', level: 35, plantXp: 35, checkXp: 7290, stages: 7, growthMinutes: 4480,
+    diseaseBase128: 14, payItem: 'limpwurtRoot', payQty: 15,
+    seedItem: 'teakSeed', logsItem: 'teakLogs',
+  },
+  mahogany: {
+    name: 'Mahogany', level: 55, plantXp: 63, checkXp: 15720, stages: 8, growthMinutes: 5120,
+    diseaseBase128: 13, payItem: 'yanillianHops', payQty: 25,
+    seedItem: 'mahoganySeed', logsItem: 'mahoganyLogs',
+  },
+  camphor: {
+    name: 'Camphor', level: 66, plantXp: 88, checkXp: 17840, stages: 8, growthMinutes: 5120,
+    diseaseBase128: 13, payItem: 'whiteBerries', payQty: 10,
+    seedItem: 'camphorSeed', logsItem: 'camphorLogs',
+  },
+  ironwood: {
+    name: 'Ironwood', level: 80, plantXp: 145, checkXp: 20380, stages: 8, growthMinutes: 5120,
+    diseaseBase128: 13, payItem: 'curryLeaf', payQty: 10,
+    seedItem: 'ironwoodSeed', logsItem: 'ironwoodLogs',
+  },
+  rosewood: {
+    name: 'Rosewood', level: 92, plantXp: 252, checkXp: 23100, stages: 9, growthMinutes: 5760,
+    diseaseBase128: 12, payItem: 'dragonfruit', payQty: 8,
+    seedItem: 'rosewoodSeed', logsItem: 'rosewoodLogs',
+  },
+} as const satisfies Record<string, HardwoodDef>;
+
+export type HardwoodKey = keyof typeof HARDWOOD_TREES;
 
 /* ------------------------------------------------------------------ */
 /* Fruit trees                                                         */
@@ -503,4 +586,45 @@ export function yieldBonusPct(secateurs: SecateursKey, farmingLevel: number): nu
 }
 
 /** Patch counts available in game, used as slider maximums. */
-export const MAX_PATCHES = { tree: 7, fruitTree: 7, herb: 10 } as const;
+export const MAX_PATCHES = { tree: 7, fruitTree: 7, hardwood: 3, herb: 10 } as const;
+
+/* ------------------------------------------------------------------ */
+/* Run cadence                                                         */
+/* ------------------------------------------------------------------ */
+
+const MINUTES_PER_DAY = 1440;
+
+/**
+ * How often each patch type can realistically be run.
+ *
+ * A crop can never be replanted faster than it grows, so growth time sets a
+ * hard ceiling. Below that ceiling the limit is how often you bother: one trip
+ * a day for trees, two for herbs. Hardwoods take 3-4 days, so the ceiling binds
+ * and you get a fraction of a run per day.
+ */
+export const RUN_CONVENTION = { tree: 1, fruitTree: 1, hardwood: 1, herb: 2 } as const;
+
+export type PatchKind = keyof typeof RUN_CONVENTION;
+
+/** Growth-limited ceiling on runs per day. */
+export function maxRunsPerDay(growthMinutes: number): number {
+  return growthMinutes > 0 ? MINUTES_PER_DAY / growthMinutes : 0;
+}
+
+/** Sensible starting cadence: convention, capped by how fast the crop grows. */
+export function defaultRunsPerDay(kind: PatchKind, growthMinutes: number): number {
+  const capped = Math.min(RUN_CONVENTION[kind], maxRunsPerDay(growthMinutes));
+  return Math.round(capped * 100) / 100;
+}
+
+/**
+ * Rough wall-clock for one trip: a couple of minutes of banking and teleporting
+ * plus time at each patch. Derived rather than asked for, since it only feeds
+ * the XP/hour readout.
+ */
+export const MINUTES_PER_RUN_OVERHEAD = 3;
+export const MINUTES_PER_PATCH = 1.5;
+
+export function minutesPerRun(patches: number): number {
+  return patches > 0 ? MINUTES_PER_RUN_OVERHEAD + patches * MINUTES_PER_PATCH : 0;
+}

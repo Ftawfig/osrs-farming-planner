@@ -1,12 +1,26 @@
 # OSRS Farming 99 Planner
 
-A Next.js calculator that models tree, fruit tree and herb runs to 99 Farming in
-Old School RuneScape, using live Grand Exchange prices.
+A Next.js calculator that models tree, hardwood, fruit tree and herb runs to 99
+Farming in Old School RuneScape, using live Grand Exchange prices.
+
+## Runs are per patch type
+
+Herbs cycle in 80 minutes and a rosewood takes four days, so a single "run" that
+does everything is meaningless. Each patch type carries its own runs-per-day and
+**days are the base unit** — the only one that composes across cadences.
+
+Cadence defaults to `min(convention, 1440 / growthMinutes)`: one trip a day for
+trees and fruit trees, two for herbs, capped by how fast the crop actually grows.
+That puts hardwoods at 0.25–0.32 runs/day without anyone guessing, and the input
+is clamped to the same growth ceiling.
+
+Because tree and fruit runs no longer happen together, gardener payments are
+settled against home-grown produce **per day** rather than per run.
 
 ## What it models
 
-- **XP and time** — XP per run per crop, runs to the next level, runs and days to
-  your target level, XP/hour and XP/day.
+- **XP and time** — XP per run and per day for each patch type, days to the next
+  level, days to your target, XP/hour and XP/day.
 - **Profit and loss** — seed, compost and gardener-payment costs against produce
   revenue, per crop and overall, per run and cumulative to the target.
 - **Disease** — per-cycle disease rolls, compost reduction, and the resulting
@@ -81,8 +95,10 @@ willows to magics on the way to 99.
 Two other values are worth knowing about:
 
 - The wiki publishes tree disease rates only for maple (13/128 over 7 cycles) and
-  magic (9/128 over 11). Oak, willow and yew use `base = 20 - cycles`, the
-  pattern those two define.
+  magic (9/128 over 11). Oak, willow, yew and every hardwood use
+  `base = 20 - cycles`, the pattern those two define.
+- Hardwood trees (teak, mahogany, camphor, ironwood, rosewood) grow in the 3
+  hardwood patches and have no roots item, so logs are their only produce.
 - Fruit trees are treated as 4 disease-vulnerable cycles per the wiki's table,
   even though they have 6 growth stages.
 

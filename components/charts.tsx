@@ -41,11 +41,20 @@ const num = (v: unknown): number => {
 
 export const COLORS = {
   tree: '#f0b429',
+  hardwood: '#c084fc',
   fruit: '#34d399',
   herb: '#60a5fa',
   cost: '#f87171',
   revenue: '#4ade80',
   level: '#fbbf24',
+};
+
+/** Series colours keyed by patch kind, so charts stay consistent. */
+export const KIND_COLORS: Record<string, string> = {
+  tree: COLORS.tree,
+  hardwood: COLORS.hardwood,
+  fruitTree: COLORS.fruit,
+  herb: COLORS.herb,
 };
 
 /** Cumulative XP over time, with every level-up marked. */
@@ -132,13 +141,9 @@ export function BankChart({ data }: { data: TimelinePoint[] }) {
   );
 }
 
-/** Runs required to clear each remaining level. */
-export function RunsPerLevelChart({ levelUps }: { levelUps: LevelUp[] }) {
-  const data = levelUps.map((l) => ({
-    level: `${l.level}`,
-    runs: Math.round(l.runsForLevel * 10) / 10,
-    cumulative: Math.round(l.run * 10) / 10,
-  }));
+/** Days required to clear each remaining level. */
+export function DaysPerLevelChart({ levelUps }: { levelUps: LevelUp[] }) {
+  const data = levelUps.map((l) => ({ level: `${l.level}`, days: Math.round(l.daysForLevel * 10) / 10 }));
 
   if (data.length === 0) {
     return <p className="py-10 text-center text-xs text-slate-500">Target already reached.</p>;
@@ -153,12 +158,9 @@ export function RunsPerLevelChart({ levelUps }: { levelUps: LevelUp[] }) {
         <Tooltip
           {...tooltipStyle}
           labelFormatter={(v: unknown) => `Level ${String(v)}`}
-          formatter={(value: unknown, name: unknown): [string, string] => [
-            `${num(value).toFixed(1)} runs`,
-            name === 'runs' ? 'For this level' : 'Cumulative',
-          ]}
+          formatter={(value: unknown): [string, string] => [`${num(value).toFixed(1)} days`, 'For this level']}
         />
-        <Bar dataKey="runs" fill={COLORS.level} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="days" fill={COLORS.level} radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -186,21 +188,20 @@ export function StrategyChart({ rows, highlight }: { rows: StrategyRow[]; highli
   );
 }
 
-export function XpBreakdownChart({ data }: { data: { label: string; xp: number }[] }) {
-  const colors = [COLORS.tree, COLORS.fruit, COLORS.herb];
+export function XpBreakdownChart({ data }: { data: { label: string; kind: string; xp: number }[] }) {
   return (
-    <ResponsiveContainer width="100%" height={200}>
+    <ResponsiveContainer width="100%" height={210}>
       <BarChart data={data} margin={{ top: 5, right: 8, left: 4, bottom: 0 }} layout="vertical">
         <CartesianGrid stroke={GRID} horizontal={false} />
         <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} tickFormatter={(v: number) => fmtGp(v)} />
-        <YAxis type="category" dataKey="label" tick={AXIS} tickLine={false} axisLine={false} width={104} />
+        <YAxis type="category" dataKey="label" tick={AXIS} tickLine={false} axisLine={false} width={118} />
         <Tooltip
           {...tooltipStyle}
-          formatter={(value: unknown): [string, string] => [`${fmtNum(num(value))} xp`, 'Per run']}
+          formatter={(value: unknown): [string, string] => [`${fmtNum(num(value))} xp`, 'Per day']}
         />
         <Bar dataKey="xp" radius={[0, 4, 4, 0]}>
-          {data.map((d, i) => (
-            <Cell key={d.label} fill={colors[i % colors.length]} />
+          {data.map((d) => (
+            <Cell key={d.label} fill={KIND_COLORS[d.kind] ?? COLORS.tree} />
           ))}
         </Bar>
       </BarChart>

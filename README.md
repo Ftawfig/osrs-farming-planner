@@ -26,9 +26,15 @@ settled against home-grown produce **per day** rather than per run.
   so they don't depend on how many patches you run. Sort by clicking a column
   heading; click a row to load that crop into the planner.
 
-Crop picks travel between the two pages as query params — `/?herb=ranarr&hardwood=camphor`
-— so a planner setup is a shareable link. Swapped crops have their cadence
-re-derived from growth time, and are level-gated against the loaded account.
+Both pages share one state, held by `PlannerProvider` in the root layout. Next
+keeps the layout mounted across client-side navigation, so flipping between the
+two keeps your whole setup — patches, protection, cadence, gear, price overrides
+— rather than resetting it. The rates page highlights whatever the planner is
+currently set to, and clicking a row swaps just that crop, re-deriving its
+cadence from growth time and level-gating it against the loaded account.
+
+State is per session: a full page reload starts fresh from the account's
+hiscores.
 
 ## Clearing a patch
 

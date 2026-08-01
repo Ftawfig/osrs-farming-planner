@@ -798,17 +798,6 @@ export function compareCrops(
   });
 }
 
-/**
- * Crop picks passed from the rates page to the planner as query params, e.g.
- * `/?herb=ranarr&hardwood=camphor`.
- */
-export const CROP_PARAM: Record<PatchKind, string> = {
-  tree: 'tree',
-  hardwood: 'hardwood',
-  fruitTree: 'fruit',
-  herb: 'herb',
-};
-
 export interface CropSelection {
   treeType?: TreeKey;
   hardwoodType?: HardwoodKey;
@@ -816,18 +805,42 @@ export interface CropSelection {
   herbType?: HerbKey;
 }
 
-/** Read crop picks out of a query string, ignoring anything unrecognised. */
-export function parseCropSelection(params: { get(name: string): string | null }): CropSelection {
-  const pick = <T extends string>(name: string, valid: readonly string[]): T | undefined => {
-    const raw = params.get(name);
-    return raw && valid.includes(raw) ? (raw as T) : undefined;
+/** Keep crop selections plantable when the level drops below their requirement. */
+export function applyLevelGating(cfg: Config): Config {
+  const level = levelForXp(cfg.currentXp);
+  const bestFor = <K extends string>(keys: K[], levelOf: (k: K) => number, current: K): K => {
+    if (levelOf(current) <= level) return current;
+    const usable = keys.filter((k) => levelOf(k) <= level);
+    if (usable.length === 0) return keys[0];
+    return usable.reduce((a, b) => (levelOf(b) > levelOf(a) ? b : a));
   };
 
+  const treeType = bestFor(Object.keys(TREES) as TreeKey[], (k) => TREES[k].level, cfg.treeType);
+  const hardwoodType = bestFor(
+    Object.keys(HARDWOOD_TREES) as HardwoodKey[],
+    (k) => HARDWOOD_TREES[k].level,
+    cfg.hardwoodType,
+  );
+
   return {
-    treeType: pick<TreeKey>(CROP_PARAM.tree, Object.keys(TREES)),
-    hardwoodType: pick<HardwoodKey>(CROP_PARAM.hardwood, Object.keys(HARDWOOD_TREES)),
-    fruitType: pick<FruitTreeKey>(CROP_PARAM.fruitTree, Object.keys(FRUIT_TREES)),
-    herbType: pick<HerbKey>(CROP_PARAM.herb, Object.keys(HERBS)),
+    ...cfg,
+    treeType,
+    hardwoodType,
+    // Cadence follows the crop, so re-derive it when gating swaps the type out.
+    treeRunsPerDay:
+      treeType === cfg.treeType
+        ? cfg.treeRunsPerDay
+        : defaultRunsPerDay('tree', TREES[treeType].growthMinutes),
+    hardwoodRunsPerDay:
+      hardwoodType === cfg.hardwoodType
+        ? cfg.hardwoodRunsPerDay
+        : defaultRunsPerDay('hardwood', HARDWOOD_TREES[hardwoodType].growthMinutes),
+    fruitType: bestFor(
+      Object.keys(FRUIT_TREES) as FruitTreeKey[],
+      (k) => FRUIT_TREES[k].level,
+      cfg.fruitType,
+    ),
+    herbType: bestFor(Object.keys(HERBS) as HerbKey[], (k) => HERBS[k].level, cfg.herbType),
   };
 }
 

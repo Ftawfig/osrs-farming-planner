@@ -46,16 +46,14 @@ import {
 import {
   Config,
   CropResult,
-  CropSelection,
-  DEFAULT_CONFIG,
-  PriceMap,
   StrategyRow,
-  applyCropSelection,
+  applyLevelGating,
   compareStrategies,
   fmtGp,
   fmtNum,
   project,
 } from '@/lib/model';
+import { playerSummary, usePlanner } from '@/components/planner-provider';
 import type { Player } from '@/lib/hiscores';
 import type { PricePayload } from '@/lib/prices';
 
@@ -132,41 +130,23 @@ const priceKeysFor = (cfg: Config): ItemKey[] => {
 /** ISO string -> "HH:MM UTC". Avoids locale-dependent hydration mismatches. */
 const utcTime = (iso: string) => `${iso.slice(11, 16)} UTC`;
 
-const playerSummary = (p: Player) => `${p.name}: level ${p.level} (${fmtNum(p.xp)} xp)`;
+export default function Planner() {
+  const {
+    cfg,
+    setCfg,
+    prices,
+    setOverrides,
+    setLive,
+    priceMeta: meta,
+    setPriceMeta: setMeta,
+    rsn,
+    setRsn,
+    rsnStatus,
+    setRsnStatus,
+  } = usePlanner();
 
-export default function Planner({
-  initial,
-  defaultRsn,
-  initialPlayer,
-  initialCrops,
-}: {
-  initial: PricePayload;
-  defaultRsn: string;
-  initialPlayer: Player | null;
-  initialCrops?: CropSelection;
-}) {
-  // Seed straight from the server-loaded character so the first paint is already
-  // that account's numbers, with DEFAULT_CONFIG as the fallback if the lookup
-  // failed. Crop picks arriving from the rates page layer on top, then get
-  // level-gated in case they name something this account cannot plant.
-  const [cfg, setCfg] = useState<Config>(() => {
-    const base = initialPlayer ? { ...DEFAULT_CONFIG, currentXp: initialPlayer.xp } : DEFAULT_CONFIG;
-    return applyLevelGating(applyCropSelection(base, initialCrops ?? {}));
-  });
-  const [live, setLive] = useState<PriceMap>(initial.prices);
-  const [overrides, setOverrides] = useState<Partial<Record<ItemKey, number>>>({});
-  const [meta, setMeta] = useState({
-    source: initial.source,
-    fetchedAt: initial.fetchedAt,
-  });
   const [loading, setLoading] = useState(false);
   const [showPrices, setShowPrices] = useState(false);
-
-  const [rsn, setRsn] = useState(defaultRsn);
-  const [rsnStatus, setRsnStatus] = useState<{
-    kind: 'idle' | 'loading' | 'ok' | 'error';
-    msg?: string;
-  }>(initialPlayer ? { kind: 'ok', msg: playerSummary(initialPlayer) } : { kind: 'idle' });
 
   const set = <K extends keyof Config>(key: K, value: Config[K]) => setCfg((c) => ({ ...c, [key]: value }));
 
@@ -201,8 +181,6 @@ export default function Planner({
       setRsnStatus({ kind: 'error', msg: 'Lookup failed.' });
     }
   };
-
-  const prices: PriceMap = useMemo(() => ({ ...live, ...overrides }), [live, overrides]);
 
   const proj = useMemo(() => project(cfg, prices), [cfg, prices]);
   const treeRows = useMemo(() => compareStrategies(cfg, prices, 'tree'), [cfg, prices]);
@@ -1063,45 +1041,6 @@ function RunsPerDayField({
       />
     </Field>
   );
-}
-
-/** Keep crop selections plantable when the level drops below their requirement. */
-function applyLevelGating(cfg: Config): Config {
-  const level = levelForXp(cfg.currentXp);
-  const bestFor = <K extends string>(keys: K[], levelOf: (k: K) => number, current: K): K => {
-    if (levelOf(current) <= level) return current;
-    const usable = keys.filter((k) => levelOf(k) <= level);
-    if (usable.length === 0) return keys[0];
-    return usable.reduce((a, b) => (levelOf(b) > levelOf(a) ? b : a));
-  };
-
-  const treeType = bestFor(Object.keys(TREES) as TreeKey[], (k) => TREES[k].level, cfg.treeType);
-  const hardwoodType = bestFor(
-    Object.keys(HARDWOOD_TREES) as HardwoodKey[],
-    (k) => HARDWOOD_TREES[k].level,
-    cfg.hardwoodType,
-  );
-
-  return {
-    ...cfg,
-    treeType,
-    hardwoodType,
-    // Cadence follows the crop, so re-derive it when gating swaps the type out.
-    treeRunsPerDay:
-      treeType === cfg.treeType
-        ? cfg.treeRunsPerDay
-        : defaultRunsPerDay('tree', TREES[treeType].growthMinutes),
-    hardwoodRunsPerDay:
-      hardwoodType === cfg.hardwoodType
-        ? cfg.hardwoodRunsPerDay
-        : defaultRunsPerDay('hardwood', HARDWOOD_TREES[hardwoodType].growthMinutes),
-    fruitType: bestFor(
-      Object.keys(FRUIT_TREES) as FruitTreeKey[],
-      (k) => FRUIT_TREES[k].level,
-      cfg.fruitType,
-    ),
-    herbType: bestFor(Object.keys(HERBS) as HerbKey[], (k) => HERBS[k].level, cfg.herbType),
-  };
 }
 
 /** Expected XP and P/L, broken out per patch type, per run and per day. */

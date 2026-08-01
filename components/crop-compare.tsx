@@ -3,10 +3,9 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, Field, Select } from '@/components/ui';
+import { usePlanner } from '@/components/planner-provider';
 import { PatchKind, Strategy, levelForXp } from '@/lib/gameData';
-import { CROP_PARAM, CropOption, DEFAULT_CONFIG, PriceMap, compareCrops, fmtGp, fmtNum } from '@/lib/model';
-import type { Player } from '@/lib/hiscores';
-import type { PricePayload } from '@/lib/prices';
+import { CropOption, compareCrops, fmtGp, fmtNum } from '@/lib/model';
 
 const STRATEGY_OPTIONS: { value: Strategy; label: string }[] = [
   { value: 'pay', label: 'Pay the gardener' },
@@ -94,42 +93,25 @@ const COLUMNS: Column[] = [
   },
 ];
 
-export default function CropCompare({
-  initial,
-  initialPlayer,
-}: {
-  initial: PricePayload;
-  initialPlayer: Player | null;
-}) {
+export default function CropCompare() {
   const router = useRouter();
+  const { cfg, prices, chooseCrop, rsnStatus } = usePlanner();
   const [strategy, setStrategy] = useState<Strategy>('pay');
 
-  // Picks accumulate here so you can choose a crop in several tables before
-  // opening the planner, and they ride along in the URL when you do.
-  const [picks, setPicks] = useState<Record<PatchKind, string>>({
-    tree: DEFAULT_CONFIG.treeType,
-    hardwood: DEFAULT_CONFIG.hardwoodType,
-    fruitTree: DEFAULT_CONFIG.fruitType,
-    herb: DEFAULT_CONFIG.herbType,
-  });
-
-  const plannerHref = (next: Record<PatchKind, string>) => {
-    const q = new URLSearchParams();
-    for (const kind of Object.keys(next) as PatchKind[]) q.set(CROP_PARAM[kind], next[kind]);
-    return `/?${q}`;
+  // Whatever the planner is currently set to, so the matching row reads as
+  // selected and picks made here survive the trip back.
+  const picks: Record<PatchKind, string> = {
+    tree: cfg.treeType,
+    hardwood: cfg.hardwoodType,
+    fruitTree: cfg.fruitType,
+    herb: cfg.herbType,
   };
 
   const choose = (kind: PatchKind, key: string) => {
-    const next = { ...picks, [kind]: key };
-    setPicks(next);
-    router.push(plannerHref(next));
+    chooseCrop(kind, key);
+    router.push('/');
   };
 
-  const cfg = useMemo(
-    () => ({ ...DEFAULT_CONFIG, currentXp: initialPlayer?.xp ?? DEFAULT_CONFIG.currentXp }),
-    [initialPlayer],
-  );
-  const prices: PriceMap = initial.prices;
   const level = levelForXp(cfg.currentXp);
 
   const tables = useMemo(
@@ -156,8 +138,8 @@ export default function CropCompare({
 
       <p className="mb-4 rounded-lg border border-white/10 bg-slate-950/50 px-3 py-2 text-xs text-slate-400">
         Rated at Farming level <span className="text-amber-300">{level}</span>
-        {initialPlayer && ` (${initialPlayer.name})`}. Crops above your level are greyed out — they still show
-        their rates so you can see what is worth training towards.{' '}
+        {rsnStatus.kind === 'ok' && rsnStatus.msg && ` — ${rsnStatus.msg.split(':')[0]}`}. Crops above your
+        level are greyed out — they still show their rates so you can see what is worth training towards.{' '}
         <span className="text-slate-300">GP per XP</span> is the headline number: lower is cheaper, and
         negative means the crop pays for itself. Click a column heading to sort, or a row to load that crop
         into the planner.

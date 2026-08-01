@@ -75,8 +75,6 @@ export interface Config {
 
   outfit: Record<OutfitPiece, boolean>;
   secateurs: SecateursKey;
-  /** Apply the 1/128 floor to post-compost disease chance. */
-  diseaseFloorAtOne: boolean;
 }
 
 export interface LineItem {
@@ -201,7 +199,7 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     const survival =
       cfg.treeStrategy === 'pay'
         ? 1
-        : survivalChance(tree.diseaseBase128, tree.stages - 1, tier, cfg.diseaseFloorAtOne);
+        : survivalChance(tree.diseaseBase128, tree.stages - 1, tier);
     const survived = cfg.treePatches * survival;
     const runs = cfg.treeRunsPerDay;
 
@@ -245,7 +243,7 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     const survival =
       cfg.hardwoodStrategy === 'pay'
         ? 1
-        : survivalChance(hw.diseaseBase128, hw.stages - 1, tier, cfg.diseaseFloorAtOne);
+        : survivalChance(hw.diseaseBase128, hw.stages - 1, tier);
     const survived = cfg.hardwoodPatches * survival;
     const runs = cfg.hardwoodRunsPerDay;
 
@@ -288,7 +286,7 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
     const survival =
       cfg.fruitStrategy === 'pay'
         ? 1
-        : survivalChance(FRUIT_TREE_DISEASE_BASE128, FRUIT_TREE_DISEASE_CYCLES, tier, cfg.diseaseFloorAtOne);
+        : survivalChance(FRUIT_TREE_DISEASE_BASE128, FRUIT_TREE_DISEASE_CYCLES, tier);
     const survived = cfg.fruitPatches * survival;
     const runs = cfg.fruitRunsPerDay;
 
@@ -325,12 +323,7 @@ export function computeDay(cfg: Config, prices: PriceMap): DayResult {
   // ---------- Herbs ----------
   const herb = HERBS[cfg.herbType];
   const diseaseFree = diseaseFreeHerbPatches(cfg.herbPatches);
-  const herbSurvival = survivalChance(
-    HERB_DISEASE_BASE128,
-    HERB_DISEASE_CYCLES,
-    cfg.herbCompost,
-    cfg.diseaseFloorAtOne,
-  );
+  const herbSurvival = survivalChance(HERB_DISEASE_BASE128, HERB_DISEASE_CYCLES, cfg.herbCompost);
   const herbSurvived = diseaseFree + (cfg.herbPatches - diseaseFree) * herbSurvival;
   const bonus = yieldBonusPct(cfg.secateurs, farmingLevel);
   const herbYieldPerPatch = expectedHerbYield(herb, farmingLevel, cfg.herbCompost, bonus);
@@ -633,7 +626,6 @@ export const DEFAULT_CONFIG: Config = {
   sellHerbs: true,
   outfit: { strawhat: false, jacket: false, trousers: false, boots: false },
   secateurs: 'magic',
-  diseaseFloorAtOne: true,
 };
 
 export const fmtGp = (n: number): string => {

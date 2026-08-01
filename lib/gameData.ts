@@ -252,19 +252,25 @@ export const STRATEGY_LABEL: Record<Strategy, string> = {
 
 /**
  * Per-cycle disease chance out of 128, after compost.
- * Wiki: compost reduces disease "by 50%, 80% or 90%, rounded down to the
- * nearest 1/128th", to a minimum chance of 1/128 per growth cycle.
+ *
+ * The published /128 figures are the *maximum disease roll*, not the chance
+ * itself, and 0 counts as a diseased roll — so the real chance is
+ * (maxRoll + 1)/128. Compost divides the max roll and rounds down.
+ *
+ * This is why nothing is ever disease-immune: ultracompost takes a magic tree's
+ * max roll to 0, but the single 0 outcome still lands, leaving 1/128 a cycle.
+ * Player field testing on the wiki's Talk:Disease (Farming) page measured ~6.9%
+ * disease for ultracomposted herbs across their 3 cycles, which this reproduces
+ * (3/128 a cycle); reading the figures as a plain chance predicts 4.6%.
  */
-export function diseaseChancePerCycle(base128: number, tier: CompostTier, floorAtOne = true): number {
-  const reduction = COMPOST[tier].diseaseReduction;
-  if (reduction === 0) return base128 / 128;
-  const reduced = Math.floor(base128 * (1 - reduction));
-  return (floorAtOne ? Math.max(1, reduced) : reduced) / 128;
+export function diseaseChancePerCycle(base128: number, tier: CompostTier): number {
+  const maxRoll = Math.floor(base128 * (1 - COMPOST[tier].diseaseReduction));
+  return (maxRoll + 1) / 128;
 }
 
 /** Probability a crop survives every vulnerable growth cycle. */
-export function survivalChance(base128: number, cycles: number, tier: CompostTier, floorAtOne = true): number {
-  return Math.pow(1 - diseaseChancePerCycle(base128, tier, floorAtOne), cycles);
+export function survivalChance(base128: number, cycles: number, tier: CompostTier): number {
+  return Math.pow(1 - diseaseChancePerCycle(base128, tier), cycles);
 }
 
 /* ------------------------------------------------------------------ */

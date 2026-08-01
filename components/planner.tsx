@@ -162,6 +162,7 @@ export default function Planner({
   const treeRows = useMemo(() => compareStrategies(cfg, prices, 'tree'), [cfg, prices]);
   const hardwoodRows = useMemo(() => compareStrategies(cfg, prices, 'hardwood'), [cfg, prices]);
   const fruitRows = useMemo(() => compareStrategies(cfg, prices, 'fruitTree'), [cfg, prices]);
+  const herbRows = useMemo(() => compareStrategies(cfg, prices, 'herb'), [cfg, prices]);
 
   const level = levelForXp(cfg.currentXp);
   const lvlBase = xpForLevel(level);
@@ -201,24 +202,31 @@ export default function Planner({
   );
   const herbOptions = gated(Object.keys(HERBS) as HerbKey[], (k) => HERBS[k].level, (k) => HERBS[k].name);
 
-  const best = (rows: StrategyRow[]) => rows.reduce((a, b) => (b.costToTarget < a.costToTarget ? b : a));
-  const bestTree = best(treeRows);
-  const bestHardwood = best(hardwoodRows);
-  const bestFruit = best(fruitRows);
+  const cheapest = (rows: StrategyRow[]) => rows.reduce((a, b) => (b.costToTarget < a.costToTarget ? b : a));
+  const fastest = (rows: StrategyRow[]) => rows.reduce((a, b) => (b.daysToTarget < a.daysToTarget ? b : a));
   const cur = (rows: StrategyRow[], s: Strategy) => rows.find((r) => r.strategy === s) ?? rows[0];
 
-  const applyBest = () =>
+  const advice = [
+    { name: `${TREES[cfg.treeType].name} trees`, rows: treeRows, current: cfg.treeStrategy },
+    { name: `${HARDWOOD_TREES[cfg.hardwoodType].name} hardwood`, rows: hardwoodRows, current: cfg.hardwoodStrategy },
+    { name: FRUIT_TREES[cfg.fruitType].name, rows: fruitRows, current: cfg.fruitStrategy },
+    { name: `${HERBS[cfg.herbType].name} herbs`, rows: herbRows, current: cfg.herbCompost },
+  ].map((a) => ({ ...a, cheapest: cheapest(a.rows), fastest: fastest(a.rows), now: cur(a.rows, a.current) }));
+
+  const applyPlan = (pick: (rows: StrategyRow[]) => StrategyRow) =>
     setCfg((c) => ({
       ...c,
-      treeStrategy: bestTree.strategy,
-      hardwoodStrategy: bestHardwood.strategy,
-      fruitStrategy: bestFruit.strategy,
+      treeStrategy: pick(treeRows).strategy,
+      hardwoodStrategy: pick(hardwoodRows).strategy,
+      fruitStrategy: pick(fruitRows).strategy,
+      herbCompost: pick(herbRows).strategy as CompostTier,
     }));
 
-  const anySuboptimal =
-    bestTree.strategy !== cfg.treeStrategy ||
-    bestHardwood.strategy !== cfg.hardwoodStrategy ||
-    bestFruit.strategy !== cfg.fruitStrategy;
+  const matchesPlan = (pick: (rows: StrategyRow[]) => StrategyRow) =>
+    pick(treeRows).strategy === cfg.treeStrategy &&
+    pick(hardwoodRows).strategy === cfg.hardwoodStrategy &&
+    pick(fruitRows).strategy === cfg.fruitStrategy &&
+    pick(herbRows).strategy === cfg.herbCompost;
 
   const days = Number.isFinite(proj.daysNeeded) ? proj.daysNeeded : 0;
   const fullOutfit = OUTFIT_KEYS.every((k) => cfg.outfit[k]);
@@ -481,14 +489,6 @@ export default function Planner({
                 +{proj.day.yieldBonusPct}% to the chance to save a harvest life
                 {level >= 99 && `, including +${FARMING_CAPE_YIELD_BONUS_PCT}% for the Farming cape`}.
               </p>
-              <div className="pt-1">
-                <Toggle
-                  checked={cfg.diseaseFloorAtOne}
-                  onChange={(b) => set('diseaseFloorAtOne', b)}
-                  label="1/128 disease floor"
-                  hint="Off = compost can reach 0% disease"
-                />
-              </div>
             </div>
           </Card>
 
@@ -563,44 +563,52 @@ export default function Planner({
             />
           </div>
 
-          <Card title="Protection verdict" subtitle="Cheapest way to keep each patch type alive, at current prices">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                { name: `${tree.name} trees`, b: bestTree, c: cur(treeRows, cfg.treeStrategy) },
-                { name: `${hardwood.name} hardwood`, b: bestHardwood, c: cur(hardwoodRows, cfg.hardwoodStrategy) },
-                { name: fruit.name, b: bestFruit, c: cur(fruitRows, cfg.fruitStrategy) },
-              ].map(({ name, b, c }) => {
-                const saving = c.costToTarget - b.costToTarget;
-                const same = b.strategy === c.strategy;
-                return (
-                  <div key={name} className="rounded-lg border border-white/10 bg-slate-950/50 p-3">
-                    <div className="text-xs font-semibold text-slate-300">{name}</div>
-                    {same ? (
-                      <p className="mt-1.5 text-sm text-emerald-400">
-                        <span className="font-semibold">{b.label}</span> is already optimal.
-                      </p>
-                    ) : (
-                      <p className="mt-1.5 text-sm text-slate-200">
-                        Switch to <span className="font-semibold text-amber-300">{b.label}</span> and save{' '}
-                        <span className="font-semibold text-emerald-400">{fmtGp(saving)} gp</span>.
-                      </p>
-                    )}
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      {(b.survival * 100).toFixed(1)}% survival &middot; {fmtNum(b.daysToTarget, 1)} days vs{' '}
-                      {fmtNum(c.daysToTarget, 1)} now
-                    </p>
-                  </div>
-                );
-              })}
+          <Card
+            title="Protection verdict"
+            subtitle="Cheapest and fastest protection per patch type, at current prices"
+          >
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {advice.map(({ name, cheapest: cheap, fastest: fast, now }) => (
+                <div key={name} className="rounded-lg border border-white/10 bg-slate-950/50 p-3">
+                  <div className="mb-2 text-xs font-semibold text-slate-300">{name}</div>
+                  <Recommendation
+                    tag="Cheapest"
+                    row={cheap}
+                    now={now}
+                    delta={now.costToTarget - cheap.costToTarget}
+                    deltaKind="gp"
+                  />
+                  <Recommendation
+                    tag="Fastest"
+                    row={fast}
+                    now={now}
+                    delta={now.daysToTarget - fast.daysToTarget}
+                    deltaKind="days"
+                    extra={
+                      fast.strategy !== cheap.strategy
+                        ? `${fmtGp(fast.costToTarget - cheap.costToTarget)} gp more than cheapest`
+                        : undefined
+                    }
+                  />
+                </div>
+              ))}
             </div>
-            {anySuboptimal && (
+            <div className="mt-3 flex flex-wrap gap-2">
               <button
-                onClick={applyBest}
-                className="mt-3 rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-amber-300"
+                onClick={() => applyPlan(cheapest)}
+                disabled={matchesPlan(cheapest)}
+                className="rounded-md bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-default disabled:opacity-40"
               >
                 Apply cheapest strategies
               </button>
-            )}
+              <button
+                onClick={() => applyPlan(fastest)}
+                disabled={matchesPlan(fastest)}
+                className="rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-default disabled:opacity-40"
+              >
+                Apply fastest strategies
+              </button>
+            </div>
           </Card>
 
           <Card title="Per-crop metrics" subtitle="Each patch type on its own cadence, after disease and the outfit bonus">
@@ -697,9 +705,15 @@ export default function Planner({
                 trip a day (two for herbs) and is capped by growth time, which is why hardwoods land below 1/day.
               </li>
               <li>
-                Disease is rolled once per vulnerable growth cycle. {tree.name} tree {tree.diseaseBase128}/128 over{' '}
-                {tree.stages - 1} cycles, fruit trees 18/128 over 4, herbs 27/128 over 3. Compost cuts that by
-                50/80/90%, rounded down to the nearest 1/128.
+                Disease is rolled once per vulnerable growth cycle. The published figures are the{' '}
+                <span className="text-slate-300">maximum roll</span>, and 0 also counts as diseased, so the real chance
+                is (max + 1)/128. Compost divides the max roll by 50/80/90% and rounds down.
+              </li>
+              <li>
+                That means nothing is ever disease-immune. Ultracompost takes a {tree.name.toLowerCase()} tree&apos;s
+                max roll to 0, but the 0 outcome still lands — 1/128 a cycle over {tree.stages - 1} cycles. Player
+                testing on the wiki&apos;s Talk:Disease page measured ~6.9% disease for ultracomposted herbs, which this
+                reproduces; reading the figures as a plain chance predicts 4.6%.
               </li>
               <li>
                 Only maple (13/128) and magic (9/128) tree rates are published. Oak, willow, yew and every hardwood use
@@ -724,6 +738,45 @@ export default function Planner({
         </div>
       </div>
     </main>
+  );
+}
+
+/** One recommendation line: the pick, and what switching to it buys you. */
+function Recommendation({
+  tag,
+  row,
+  now,
+  delta,
+  deltaKind,
+  extra,
+}: {
+  tag: string;
+  row: StrategyRow;
+  now: StrategyRow;
+  delta: number;
+  deltaKind: 'gp' | 'days';
+  extra?: string;
+}) {
+  const active = row.strategy === now.strategy;
+  const worthwhile = delta > (deltaKind === 'days' ? 0.05 : 1);
+
+  return (
+    <div className="border-t border-white/5 py-1.5 first:border-t-0 first:pt-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10px] font-medium tracking-wide text-slate-500 uppercase">{tag}</span>
+        {active && <span className="text-[10px] font-medium text-emerald-400">current</span>}
+      </div>
+      <div className="text-xs font-semibold text-amber-300">{row.label}</div>
+      <div className="mt-0.5 text-[11px] tabular-nums text-slate-500">
+        {fmtGp(row.costToTarget)} gp &middot; {fmtNum(row.daysToTarget, 1)} days
+      </div>
+      {!active && worthwhile && (
+        <div className="text-[11px] text-emerald-400">
+          {deltaKind === 'gp' ? `saves ${fmtGp(delta)} gp` : `saves ${delta.toFixed(1)} days`}
+        </div>
+      )}
+      {extra && <div className="text-[11px] text-slate-500">{extra}</div>}
+    </div>
   );
 }
 

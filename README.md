@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OSRS Farming 99 Planner
 
-## Getting Started
+A Next.js calculator that models tree, fruit tree and herb runs to 99 Farming in
+Old School RuneScape, using live Grand Exchange prices.
 
-First, run the development server:
+## What it models
+
+- **XP and time** — XP per run per crop, runs to the next level, runs and days to
+  your target level, XP/hour and XP/day.
+- **Profit and loss** — seed, compost and gardener-payment costs against produce
+  revenue, per crop and overall, per run and cumulative to the target.
+- **Disease** — per-cycle disease rolls, compost reduction, and the resulting
+  expected losses when a tree dies before you get back to it.
+- **Protection strategy** — pay the gardener vs each compost tier, compared on
+  whole-run totals so knock-on effects (produce freed up for sale) are included.
+- **Gear** — each farmer's outfit piece and the full-set bonus, plus secateurs.
+
+## Live pricing
+
+Prices come from the [OSRS Wiki price API](https://prices.runescape.wiki/api/v1/osrs/latest),
+proxied server-side so the browser never hits a CORS wall and the request carries
+a descriptive `User-Agent` as the wiki asks.
+
+- `app/api/prices/route.ts` — cached for 5 minutes, falls back to a bundled
+  snapshot if the upstream is unreachable.
+- `app/api/hiscores/route.ts` — looks up a character's Farming XP from the
+  official OSRS hiscores.
+
+Set a contact string in `PRICE_API_USER_AGENT` so the wiki can reach you if the
+app ever misbehaves:
+
+```bash
+vercel env add PRICE_API_USER_AGENT
+```
+
+## Running locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deploying to Vercel
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Push the repo and import it — no configuration needed. The price route is an ISR
+route with a 5 minute revalidate; the hiscores route is dynamic.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Data sources
 
-## Learn More
+Game constants live in `lib/gameData.ts`, each sourced from the OSRS Wiki:
+individual seed pages for XP and yields, `Disease (Farming)` for disease rates,
+and `Farmer's outfit` for the XP bonuses.
 
-To learn more about Next.js, take a look at the following resources:
+Yields are derived rather than entered by hand:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Roots** step up every 8 Farming levels from the tree's own requirement,
+  capping at 4 (yew gives 1/2/3/4 at 60/68/76/84, magic at 75/83/91/99).
+- **Logs** average 8 per tree — farmed trees have a 1/8 chance to deplete per log,
+  and you have to fell the tree to reach the stump anyway.
+- **Disease-free herb patches** come from the standard patch order in
+  `HERB_PATCHES`, so 7 patches includes Hosidius and Troll Stronghold.
+- **Herb yield** is computed from the herb, your Farming level, compost tier and
+  secateurs.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The sell toggles decide whether roots, logs, herbs and spare fruit count towards
+profit and loss; they never change XP.
 
-## Deploy on Vercel
+Two other values are worth knowing about:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- The wiki publishes tree disease rates only for maple (13/128 over 7 cycles) and
+  magic (9/128 over 11). Oak, willow and yew use `base = 20 - cycles`, the
+  pattern those two define.
+- Fruit trees are treated as 4 disease-vulnerable cycles per the wiki's table,
+  even though they have 6 growth stages.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Both are isolated in `lib/gameData.ts` if you want to change them.

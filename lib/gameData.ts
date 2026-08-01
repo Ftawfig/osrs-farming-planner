@@ -565,8 +565,26 @@ export function outfitXpBonusPct(worn: Record<OutfitPiece, boolean>): number {
   const keys = Object.keys(OUTFIT_PIECES) as OutfitPiece[];
   const sum = keys.reduce((s, k) => s + (worn[k] ? OUTFIT_PIECES[k].bonus : 0), 0);
   const full = keys.every((k) => worn[k]);
-  return sum + (full ? OUTFIT_FULL_SET_BONUS : 0);
+  // Rounded because summing tenths in binary floating point gives 2.5000000000000004.
+  return Math.round((sum + (full ? OUTFIT_FULL_SET_BONUS : 0)) * 100) / 100;
 }
+
+/** Every piece worn — 2.5% once the set bonus is included. */
+export const OUTFIT_ALL_WORN: Record<OutfitPiece, boolean> = {
+  strawhat: true,
+  jacket: true,
+  trousers: true,
+  boots: true,
+};
+
+export const OUTFIT_NONE_WORN: Record<OutfitPiece, boolean> = {
+  strawhat: false,
+  jacket: false,
+  trousers: false,
+  boots: false,
+};
+
+export const OUTFIT_FULL_BONUS_PCT = outfitXpBonusPct(OUTFIT_ALL_WORN);
 
 /** Only magic secateurs affect yield (+10%); the plain pair is just a tool. */
 export const SECATEURS = {

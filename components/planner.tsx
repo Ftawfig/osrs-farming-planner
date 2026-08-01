@@ -25,6 +25,9 @@ import {
   ITEM_NAMES,
   ItemKey,
   MAX_PATCHES,
+  OUTFIT_ALL_WORN,
+  OUTFIT_FULL_BONUS_PCT,
+  OUTFIT_NONE_WORN,
   OUTFIT_PIECES,
   OutfitPiece,
   SECATEURS,
@@ -218,6 +221,7 @@ export default function Planner({
     bestFruit.strategy !== cfg.fruitStrategy;
 
   const days = Number.isFinite(proj.daysNeeded) ? proj.daysNeeded : 0;
+  const fullOutfit = OUTFIT_KEYS.every((k) => cfg.outfit[k]);
   const diseaseFreeNames = diseaseFreeHerbPatchNames(cfg.herbPatches);
   const tree = TREES[cfg.treeType];
   const hardwood = HARDWOOD_TREES[cfg.hardwoodType];
@@ -450,16 +454,24 @@ export default function Planner({
 
           <Card title="Gear" subtitle={`+${proj.day.outfitBonusPct.toFixed(1)}% farming XP`}>
             <div className="space-y-2">
-              {OUTFIT_KEYS.map((k) => (
-                <Toggle
-                  key={k}
-                  checked={cfg.outfit[k]}
-                  onChange={(b) => set('outfit', { ...cfg.outfit, [k]: b })}
-                  label={OUTFIT_PIECES[k].label}
-                  hint={`+${OUTFIT_PIECES[k].bonus}% xp`}
-                />
-              ))}
-              <p className="px-0.5 text-[10px] text-slate-500">Full set adds a further +0.5%.</p>
+              <Toggle
+                checked={fullOutfit}
+                onChange={(b) => set('outfit', b ? OUTFIT_ALL_WORN : OUTFIT_NONE_WORN)}
+                label="Full farmer's outfit"
+                hint={`all four pieces · +${OUTFIT_FULL_BONUS_PCT}% xp`}
+              />
+              <div className="space-y-2 border-t border-white/10 pt-2">
+                {OUTFIT_KEYS.map((k) => (
+                  <Toggle
+                    key={k}
+                    checked={cfg.outfit[k]}
+                    onChange={(b) => set('outfit', { ...cfg.outfit, [k]: b })}
+                    label={OUTFIT_PIECES[k].label}
+                    hint={`+${OUTFIT_PIECES[k].bonus}% xp`}
+                  />
+                ))}
+              </div>
+              <p className="px-0.5 text-[10px] text-slate-500">Wearing all four adds a further +0.5%.</p>
               <div className="pt-1">
                 <Field label="Secateurs">
                   <Select value={cfg.secateurs} onChange={(v) => set('secateurs', v)} options={SECATEURS_OPTIONS} />
